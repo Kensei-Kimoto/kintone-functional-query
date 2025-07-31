@@ -1,0 +1,23 @@
+# ソースファイル
+src/
+tests/
+
+# 設定ファイル
+tsconfig.json
+vitest.config.ts
+.eslintrc.json
+
+# 開発用ファイル
+*.ts
+!*.d.ts
+*.map
+
+# テスト関連
+coverage/
+.nyc_output/
+
+# その他
+.DS_Store
+.vscode/
+.idea/
+*.log

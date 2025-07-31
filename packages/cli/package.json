@@ -1,0 +1,56 @@
+{
+  "name": "@kintone-functional-query/cli",
+  "version": "0.1.0",
+  "description": "CLI tool for generating type-safe kintone query schemas",
+  "bin": {
+    "kintone-query-gen": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
+  },
+  "keywords": [
+    "kintone",
+    "cli",
+    "codegen",
+    "typescript"
+  ],
+  "author": "kimotokensei",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimotokensei/kintone-functional-query.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/kimotokensei/kintone-functional-query/issues"
+  },
+  "homepage": "https://github.com/kimotokensei/kintone-functional-query#readme",
+  "dependencies": {
+    "@effect/cli": "^0.45.0",
+    "@effect/platform": "^0.69.0",
+    "@effect/platform-node": "^0.63.0",
+    "@kintone-functional-query/core": "workspace:*",
+    "effect": "^3.0.0",
+    "kintone-effect-schema": "*",
+    "prettier": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
