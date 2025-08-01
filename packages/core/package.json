@@ -1,6 +1,6 @@
 {
   "name": "@kintone-functional-query/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Type-safe functional query builder for kintone",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
