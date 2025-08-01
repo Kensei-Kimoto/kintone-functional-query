@@ -1,6 +1,6 @@
 {
   "name": "kintone-functional-query",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Type-safe functional query builder for kintone with CLI schema generator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
