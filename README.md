@@ -10,8 +10,8 @@ Type-safe functional query builder for kintone
 
 このプロジェクトはmonorepo構造になっています：
 
-- **@kintone-functional-query/core**: クエリビルダーのコアライブラリ
-- **@kintone-functional-query/cli**: スキーマ生成用CLIツール
+- **kintone-functional-query**: クエリビルダーのコアライブラリ
+- **kintone-functional-query-cli**: スキーマ生成用CLIツール
 
 ## 概要
 
@@ -28,10 +28,10 @@ kintone-functional-queryは、kintoneのクエリをラムダ式で型安全に�
 
 ```bash
 # コアライブラリ
-npm install @kintone-functional-query/core
+npm install kintone-functional-query
 
 # CLIツール（開発時のみ）
-npm install -D @kintone-functional-query/cli
+npm install -D kintone-functional-query-cli
 ```
 
 ## 使用例
@@ -83,7 +83,7 @@ export type App = S.Schema.Type<typeof AppSchema>;
 ### 2. 生成された型を使ってクエリ構築
 
 ```typescript
-import { kintoneQuery, TODAY, FROM_TODAY, subTable } from '@kintone-functional-query/core';
+import { kintoneQuery, TODAY, FROM_TODAY, subTable } from 'kintone-functional-query';
 import { App } from './generated/schema';
 
 // シンプルなクエリ
@@ -212,7 +212,7 @@ webpack等でバンドルして使用してください。
 ## サブテーブルのサポート
 
 ```typescript
-import { kintoneQuery, subTable } from '@kintone-functional-query/core';
+import { kintoneQuery, subTable } from 'kintone-functional-query';
 
 // サブテーブルを定義
 const 注文明細 = subTable('注文明細');

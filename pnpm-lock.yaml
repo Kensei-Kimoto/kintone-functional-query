@@ -23,15 +23,15 @@ importers:
       '@effect/platform-node':
         specifier: ^0.63.0
         version: 0.63.6(@effect/platform@0.69.31(effect@3.17.4))(effect@3.17.4)
-      '@kintone-functional-query/core':
-        specifier: workspace:*
-        version: link:../core
       effect:
         specifier: ^3.0.0
         version: 3.17.4
       kintone-effect-schema:
         specifier: '*'
         version: 0.2.0(effect@3.17.4)
+      kintone-functional-query:
+        specifier: workspace:*
+        version: link:../core
       prettier:
         specifier: ^3.0.0
         version: 3.6.2

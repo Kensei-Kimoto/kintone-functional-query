@@ -1,5 +1,5 @@
 {
-  "name": "@kintone-functional-query/cli",
+  "name": "kintone-functional-query-cli",
   "version": "0.1.1",
   "description": "CLI tool for generating type-safe kintone query schemas",
   "bin": {
@@ -39,7 +39,7 @@
     "@effect/cli": "^0.45.0",
     "@effect/platform": "^0.69.0",
     "@effect/platform-node": "^0.63.0",
-    "@kintone-functional-query/core": "workspace:*",
+    "kintone-functional-query": "workspace:*",
     "effect": "^3.0.0",
     "kintone-effect-schema": "*",
     "prettier": "^3.0.0"

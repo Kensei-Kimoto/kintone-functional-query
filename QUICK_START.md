@@ -9,7 +9,7 @@
 npm install kintone-functional-query
 
 # CLIツール（開発時のみ）
-npm install -D @kintone-functional-query/cli
+npm install -D kintone-functional-query-cli
 ```
 
 ### 2. スキーマ生成（推奨）

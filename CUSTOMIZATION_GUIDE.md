@@ -41,7 +41,7 @@ npm init -y
 
 # 必要なパッケージをインストール
 npm install kintone-functional-query
-npm install -D @kintone-functional-query/cli typescript webpack webpack-cli ts-loader
+npm install -D kintone-functional-query-cli typescript webpack webpack-cli ts-loader
 
 # TypeScript設定
 npx tsc --init
