@@ -6,33 +6,35 @@
 
 Type-safe functional query builder for kintone
 
-## 機能
+[日本語版 README はこちら](README.ja.md)
 
-- **クエリビルダー**: ラムダ式で型安全なkintoneクエリを構築
-- **CLIツール**: kintone APIからEffect Schemaを自動生成
-- **完全な型サポート**: TypeScriptの型システムを最大限活用
-- **全演算子対応**: kintoneのすべてのクエリ演算子をサポート
+## Features
 
-## 概要
+- **Query Builder**: Build type-safe kintone queries with lambda expressions
+- **CLI Tool**: Auto-generate Effect Schema from kintone API
+- **Full Type Support**: Leverage TypeScript's type system to its fullest
+- **All Operators**: Support for all kintone query operators
 
-kintone-functional-queryは、kintoneのクエリをラムダ式で型安全に記述できるTypeScriptライブラリです。IDEの補完機能を活用して、直感的にクエリを構築できます。
+## Overview
 
-## 特徴
+kintone-functional-query is a TypeScript library that allows you to write type-safe kintone queries using lambda expressions. Take advantage of IDE auto-completion to build queries intuitively.
 
-- 🔒 **型安全**: TypeScriptの型システムを活用した型安全なクエリ構築
-- ✨ **直感的**: ラムダ式による自然な記述
-- 🚀 **補完対応**: IDEの自動補完で快適な開発体験
-- 🔧 **柔軟**: 演算子、関数、order by、limit、offsetをサポート
+## Features
 
-## インストール
+- 🔒 **Type-safe**: Type-safe query construction using TypeScript's type system
+- ✨ **Intuitive**: Natural syntax with lambda expressions
+- 🚀 **Auto-completion**: Comfortable development experience with IDE auto-completion
+- 🔧 **Flexible**: Support for operators, functions, order by, limit, and offset
+
+## Installation
 
 ```bash
 npm install kintone-functional-query
 ```
 
-## 使用例
+## Usage
 
-### 1. CLIでスキーマを生成
+### 1. Generate Schema with CLI
 
 ```bash
 npx kintone-query-gen generate \
@@ -42,7 +44,7 @@ npx kintone-query-gen generate \
   --output ./src/generated
 ```
 
-#### 生成されるファイルの例
+#### Generated File Example
 
 ```typescript
 // ./src/generated/schema.ts
@@ -57,73 +59,73 @@ import {
 } from 'kintone-effect-schema';
 
 export const AppSchema = S.Struct({
-  顧客名: SingleLineTextFieldSchema,
-  担当者: UserSelectFieldSchema,
-  金額: NumberFieldSchema,
-  契約日: DateFieldSchema,
-  ステータス: DropDownFieldSchema,
-  注文明細: SubtableFieldSchema(
+  CustomerName: SingleLineTextFieldSchema,
+  SalesRep: UserSelectFieldSchema,
+  Amount: NumberFieldSchema,
+  ContractDate: DateFieldSchema,
+  Status: DropDownFieldSchema,
+  OrderDetails: SubtableFieldSchema(
     S.Struct({
-      商品コード: SingleLineTextFieldSchema,
-      商品名: SingleLineTextFieldSchema,
-      数量: NumberFieldSchema,
-      単価: NumberFieldSchema,
+      ProductCode: SingleLineTextFieldSchema,
+      ProductName: SingleLineTextFieldSchema,
+      Quantity: NumberFieldSchema,
+      UnitPrice: NumberFieldSchema,
     })
   ),
 });
 
-// 型も自動的にエクスポートされる！
+// Type is automatically exported too!
 export type App = S.Schema.Type<typeof AppSchema>;
 ```
 
-### 2. 生成された型を使ってクエリ構築
+### 2. Build Queries with Generated Types
 
 ```typescript
 import { kintoneQuery, TODAY, FROM_TODAY, subTable } from 'kintone-functional-query';
 import { App } from './generated/schema';
 
-// シンプルなクエリ
+// Simple query
 const query1 = kintoneQuery<App>(r =>
-  r.顧客名.equals("サイボウズ株式会社")
+  r.CustomerName.equals("Cybozu Inc.")
 ).build();
-// => '顧客名 = "サイボウズ株式会社"'
+// => 'CustomerName = "Cybozu Inc."'
 
-// 複数条件の組み合わせ
+// Multiple conditions
 const query2 = kintoneQuery<App>(r =>
-  r.顧客名.equals("サイボウズ株式会社") &&
-  r.契約日.lessThan(TODAY()) &&
-  r.ステータス.notIn(["完了", "キャンセル"])
+  r.CustomerName.equals("Cybozu Inc.") &&
+  r.ContractDate.lessThan(TODAY()) &&
+  r.Status.notIn(["Completed", "Cancelled"])
 ).build();
-// => '((顧客名 = "サイボウズ株式会社" and 契約日 < TODAY()) and ステータス not in ("完了", "キャンセル"))'
+// => '((CustomerName = "Cybozu Inc." and ContractDate < TODAY()) and Status not in ("Completed", "Cancelled"))'
 
-// 全部盛りの例（orderBy、limit、offset）
+// Full example with orderBy, limit, offset
 const query3 = kintoneQuery<App>(r =>
-  r.金額.greaterThan(1000000) &&
-  r.契約日.greaterThanOrEqual(FROM_TODAY(-30, 'DAYS')) &&
-  r.ステータス.in(["商談中", "受注"])
+  r.Amount.greaterThan(1000000) &&
+  r.ContractDate.greaterThanOrEqual(FROM_TODAY(-30, 'DAYS')) &&
+  r.Status.in(["Negotiating", "Ordered"])
 )
-  .orderBy('金額', 'desc')
+  .orderBy('Amount', 'desc')
   .limit(100)
   .offset(20)
   .build();
-// => '((金額 > 1000000 and 契約日 >= FROM_TODAY(-30, "DAYS")) and ステータス in ("商談中", "受注")) order by 金額 desc limit 100 offset 20'
+// => '((Amount > 1000000 and ContractDate >= FROM_TODAY(-30, "DAYS")) and Status in ("Negotiating", "Ordered")) order by Amount desc limit 100 offset 20'
 
-// サブテーブルを含むクエリ
-const 注文明細 = subTable('注文明細');
+// Query with subtable
+const OrderDetails = subTable('OrderDetails');
 const query4 = kintoneQuery<App>(r =>
-  r.顧客名.like("株式会社%") &&
-  注文明細.商品コード.in(['P001', 'P002', 'P003']) &&
-  注文明細.数量.greaterThan(100)
+  r.CustomerName.like("Corp%") &&
+  OrderDetails.ProductCode.in(['P001', 'P002', 'P003']) &&
+  OrderDetails.Quantity.greaterThan(100)
 )
-  .orderBy('契約日', 'desc')
+  .orderBy('ContractDate', 'desc')
   .limit(50)
   .build();
-// => '((顧客名 like "株式会社%" and 注文明細.商品コード in ("P001", "P002", "P003")) and 注文明細.数量 > 100) order by 契約日 desc limit 50'
+// => '((CustomerName like "Corp%" and OrderDetails.ProductCode in ("P001", "P002", "P003")) and OrderDetails.Quantity > 100) order by ContractDate desc limit 50'
 ```
 
-### 3. カスタマイズでの使用
+### 3. Use in Customization
 
-CLIで生成した型を使うことで、カスタマイズでも型安全に開発できます：
+You can develop type-safely in customizations using CLI-generated types:
 
 ```typescript
 // customize.ts
@@ -132,15 +134,15 @@ import { App } from './generated/schema';
 
 kintone.events.on('app.record.index.show', (event) => {
   const button = document.createElement('button');
-  button.textContent = '重要な案件を検索';
+  button.textContent = 'Search Important Deals';
   button.onclick = async () => {
-    // 型安全！フィールド名の補完も効く
+    // Type-safe! Field names are auto-completed
     const query = kintoneQuery<App>(r =>
-      r.優先度.equals("高") &&
-      r.期限日.lessThanOrEqual(FROM_TODAY(7, 'DAYS')) &&
-      r.ステータス.notIn(["完了", "キャンセル"])
+      r.Priority.equals("High") &&
+      r.DueDate.lessThanOrEqual(FROM_TODAY(7, 'DAYS')) &&
+      r.Status.notIn(["Completed", "Cancelled"])
     )
-      .orderBy('期限日', 'asc')
+      .orderBy('DueDate', 'asc')
       .limit(50)
       .build();
     
@@ -149,7 +151,7 @@ kintone.events.on('app.record.index.show', (event) => {
       query: query
     });
     
-    console.log(`${resp.records.length}件の重要案件があります`);
+    console.log(`Found ${resp.records.length} important deals`);
   };
   
   kintone.app.getHeaderMenuSpaceElement().appendChild(button);
@@ -157,172 +159,172 @@ kintone.events.on('app.record.index.show', (event) => {
 });
 ```
 
-webpack等でバンドルして使用してください。
+Bundle with webpack or similar tools for use.
 
-## サポートするメソッド
+## Supported Methods
 
-### 比較メソッド
-- `equals(value)`: 等価比較（`=`）
-- `notEquals(value)`: 不等価比較（`!=`）
-- `greaterThan(value)`: より大きい（`>`）
-- `lessThan(value)`: より小さい（`<`）
-- `greaterThanOrEqual(value)`: 以上（`>=`）
-- `lessThanOrEqual(value)`: 以下（`<=`）
+### Comparison Methods
+- `equals(value)`: Equal (`=`)
+- `notEquals(value)`: Not equal (`!=`)
+- `greaterThan(value)`: Greater than (`>`)
+- `lessThan(value)`: Less than (`<`)
+- `greaterThanOrEqual(value)`: Greater than or equal (`>=`)
+- `lessThanOrEqual(value)`: Less than or equal (`<=`)
 
-### 配列メソッド
-- `in(values)`: 含まれる（`in`）
-- `notIn(values)`: 含まれない（`not in`）
+### Array Methods
+- `in(values)`: In (`in`)
+- `notIn(values)`: Not in (`not in`)
 
-### 文字列メソッド
-- `like(pattern)`: パターンマッチ（`like`）
-- `notLike(pattern)`: パターン不一致（`not like`）
+### String Methods
+- `like(pattern)`: Pattern match (`like`)
+- `notLike(pattern)`: Pattern not match (`not like`)
 
-### 空チェックメソッド
-- `isEmpty()`: 空である（`is empty`）
-- `isNotEmpty()`: 空でない（`is not empty`）
+### Null Check Methods
+- `isEmpty()`: Is empty (`is empty`)
+- `isNotEmpty()`: Is not empty (`is not empty`)
 
-### 論理演算子
-- `&&`: AND条件
-- `||`: OR条件
+### Logical Operators
+- `&&`: AND condition
+- `||`: OR condition
 
-## サポートする関数
+## Supported Functions
 
-### 日付・時刻関数
-- `TODAY()`: 今日の日付
-- `NOW()`: 現在の日時
-- `YESTERDAY()`: 昨日
-- `TOMORROW()`: 明日
-- `FROM_TODAY(days, unit?)`: 今日からの相対日付
-- `THIS_WEEK()`: 今週
-- `LAST_WEEK()`: 先週
-- `NEXT_WEEK()`: 来週
-- `THIS_MONTH()`: 今月
-- `LAST_MONTH()`: 先月
-- `NEXT_MONTH()`: 来月
-- `THIS_YEAR()`: 今年
+### Date/Time Functions
+- `TODAY()`: Today's date
+- `NOW()`: Current datetime
+- `YESTERDAY()`: Yesterday
+- `TOMORROW()`: Tomorrow
+- `FROM_TODAY(days, unit?)`: Relative date from today
+- `THIS_WEEK()`: This week
+- `LAST_WEEK()`: Last week
+- `NEXT_WEEK()`: Next week
+- `THIS_MONTH()`: This month
+- `LAST_MONTH()`: Last month
+- `NEXT_MONTH()`: Next month
+- `THIS_YEAR()`: This year
 
-### ユーザー・組織関数
-- `LOGINUSER()`: ログインユーザー
-- `PRIMARY_ORGANIZATION()`: プライマリー組織
+### User/Organization Functions
+- `LOGINUSER()`: Login user
+- `PRIMARY_ORGANIZATION()`: Primary organization
 
-## サブテーブルのサポート
+## Subtable Support
 
 ```typescript
 import { kintoneQuery, subTable } from 'kintone-functional-query';
 
-// サブテーブルを定義
-const 注文明細 = subTable('注文明細');
+// Define subtable
+const OrderDetails = subTable('OrderDetails');
 
-// サブテーブルでのクエリ
+// Query with subtable
 const query = kintoneQuery(() => 
-  注文明細.商品コード.in(['P001', 'P002'])
+  OrderDetails.ProductCode.in(['P001', 'P002'])
 ).build();
-// => '注文明細.商品コード in ("P001", "P002")'
+// => 'OrderDetails.ProductCode in ("P001", "P002")'
 
-// メインテーブルとの組み合わせ
+// Combine with main table
 const query = kintoneQuery(r =>
-  r.顧客名.like("株式会社%") &&
-  注文明細.数量.greaterThan(100)
+  r.CustomerName.like("Corp%") &&
+  OrderDetails.Quantity.greaterThan(100)
 ).build();
-// => '(顧客名 like "株式会社%" and 注文明細.数量 > 100)'
+// => '(CustomerName like "Corp%" and OrderDetails.Quantity > 100)'
 ```
 
-**注意**: kintoneの仕様により、サブテーブルでは`equals`と`notEquals`は使用できません。
+**Note**: Due to kintone specifications, `equals` and `notEquals` cannot be used with subtables.
 
-## 複雑な条件の組み合わせ
+## Complex Condition Combinations
 
-### 基本的な優先順位
+### Basic Precedence
 ```typescript
-// (A && B) || C のパターン
+// (A && B) || C pattern
 const query1 = kintoneQuery<App>(r =>
-  (r.ステータス.equals("商談中") && r.確度.greaterThan(70)) ||
-  r.担当者.in([LOGINUSER()])
+  (r.Status.equals("Negotiating") && r.Probability.greaterThan(70)) ||
+  r.SalesRep.in([LOGINUSER()])
 ).build();
-// => '((ステータス = "商談中" and 確度 > 70) or 担当者 in (LOGINUSER()))'
+// => '((Status = "Negotiating" and Probability > 70) or SalesRep in (LOGINUSER()))'
 
-// A && (B || C) のパターン
+// A && (B || C) pattern
 const query2 = kintoneQuery<App>(r =>
-  r.金額.greaterThan(1000000) &&
-  (r.優先度.equals("高") || r.期限日.lessThan(TODAY()))
+  r.Amount.greaterThan(1000000) &&
+  (r.Priority.equals("High") || r.DueDate.lessThan(TODAY()))
 ).build();
-// => '(金額 > 1000000 and (優先度 = "高" or 期限日 < TODAY()))'
+// => '(Amount > 1000000 and (Priority = "High" or DueDate < TODAY()))'
 ```
 
-### ネストした条件
+### Nested Conditions
 ```typescript
-// ((A || B) && C) || (D && E) のパターン
+// ((A || B) && C) || (D && E) pattern
 const query3 = kintoneQuery<App>(r =>
-  ((r.ステータス.equals("商談中") || r.ステータス.equals("見積提出")) &&
-   r.金額.greaterThan(1000000)) ||
-  (r.優先度.equals("高") && r.期限日.lessThan(TODAY()))
+  ((r.Status.equals("Negotiating") || r.Status.equals("Quote Sent")) &&
+   r.Amount.greaterThan(1000000)) ||
+  (r.Priority.equals("High") && r.DueDate.lessThan(TODAY()))
 ).build();
-// => '(((ステータス = "商談中" or ステータス = "見積提出") and 金額 > 1000000) or (優先度 = "高" and 期限日 < TODAY()))'
+// => '(((Status = "Negotiating" or Status = "Quote Sent") and Amount > 1000000) or (Priority = "High" and DueDate < TODAY()))'
 ```
 
-### 実践的な複雑なクエリ
+### Practical Complex Query
 ```typescript
-// 営業案件の優先度判定
+// Sales opportunity priority determination
 const complexQuery = kintoneQuery<App>(r =>
-  // 高優先度の条件
+  // High priority conditions
   (
-    (r.確度.greaterThanOrEqual(80) && r.金額.greaterThan(5000000)) ||
-    (r.期限日.lessThanOrEqual(FROM_TODAY(7, 'DAYS')) && r.ステータス.notEquals("失注"))
+    (r.Probability.greaterThanOrEqual(80) && r.Amount.greaterThan(5000000)) ||
+    (r.DueDate.lessThanOrEqual(FROM_TODAY(7, 'DAYS')) && r.Status.notEquals("Lost"))
   ) &&
-  // 共通条件
-  r.担当者.in([LOGINUSER()]) &&
-  // 除外条件
-  r.顧客区分.notIn(["休眠顧客", "ブラックリスト"])
+  // Common conditions
+  r.SalesRep.in([LOGINUSER()]) &&
+  // Exclusion conditions
+  r.CustomerCategory.notIn(["Dormant", "Blacklist"])
 )
-  .orderBy('金額', 'desc')
+  .orderBy('Amount', 'desc')
   .limit(20)
   .build();
-// => '((((確度 >= 80 and 金額 > 5000000) or (期限日 <= FROM_TODAY(7, "DAYS") and ステータス != "失注")) and 担当者 in (LOGINUSER())) and 顧客区分 not in ("休眠顧客", "ブラックリスト")) order by 金額 desc limit 20'
+// => '((((Probability >= 80 and Amount > 5000000) or (DueDate <= FROM_TODAY(7, "DAYS") and Status != "Lost")) and SalesRep in (LOGINUSER())) and CustomerCategory not in ("Dormant", "Blacklist")) order by Amount desc limit 20'
 ```
 
-### サブテーブルを含む複雑な条件
+### Complex Conditions with Subtables
 ```typescript
-const 商品明細 = subTable('商品明細');
+const ProductDetails = subTable('ProductDetails');
 
 const advancedQuery = kintoneQuery<App>(r =>
   (
-    // 顧客条件
-    (r.顧客名.like("%株式会社%") || r.顧客名.like("%有限会社%")) &&
-    r.契約日.greaterThanOrEqual(THIS_MONTH())
+    // Customer conditions
+    (r.CustomerName.like("%Corp%") || r.CustomerName.like("%Ltd%")) &&
+    r.ContractDate.greaterThanOrEqual(THIS_MONTH())
   ) &&
   (
-    // サブテーブル条件（高額商品または大量購入）
-    商品明細.商品カテゴリ.in(["A", "B"]) ||
-    (商品明細.単価.greaterThan(10000) && 商品明細.数量.greaterThan(10))
+    // Subtable conditions (high-value products or bulk purchases)
+    ProductDetails.ProductCategory.in(["A", "B"]) ||
+    (ProductDetails.UnitPrice.greaterThan(10000) && ProductDetails.Quantity.greaterThan(10))
   ) &&
-  // ステータス条件
+  // Status conditions
   (
-    r.ステータス.equals("受注") ||
-    (r.ステータス.equals("商談中") && r.確度.greaterThanOrEqual(70))
+    r.Status.equals("Ordered") ||
+    (r.Status.equals("Negotiating") && r.Probability.greaterThanOrEqual(70))
   )
 ).build();
-// => '((((顧客名 like "%株式会社%" or 顧客名 like "%有限会社%") and 契約日 >= THIS_MONTH()) and (商品明細.商品カテゴリ in ("A", "B") or (商品明細.単価 > 10000 and 商品明細.数量 > 10))) and (ステータス = "受注" or (ステータス = "商談中" and 確度 >= 70)))'
+// => '((((CustomerName like "%Corp%" or CustomerName like "%Ltd%") and ContractDate >= THIS_MONTH()) and (ProductDetails.ProductCategory in ("A", "B") or (ProductDetails.UnitPrice > 10000 and ProductDetails.Quantity > 10))) and (Status = "Ordered" or (Status = "Negotiating" and Probability >= 70)))'
 ```
 
-### 論理演算の優先順位について
-- JavaScriptの演算子優先順位に従います（`&&` が `||` より優先）
-- 明示的に括弧を使用することで、意図した優先順位を確実に指定できます
-- 生成されるクエリでは、すべての論理演算が適切に括弧で囲まれます
+### About Logical Operation Precedence
+- Follows JavaScript operator precedence (`&&` has higher precedence than `||`)
+- Use parentheses explicitly to ensure intended precedence
+- Generated queries will have all logical operations properly parenthesized
 
-## フロントエンドでの使用
+## Frontend Usage
 
-フロントエンド（kintoneカスタマイズ・プラグイン）での使用方法は、開発するものによって2つのアプローチがあります。
+For frontend usage (kintone customizations/plugins), there are two approaches depending on what you're developing.
 
-### A. 特定アプリのカスタマイズ開発（推奨）
+### A. Specific App Customization Development (Recommended)
 
-**対象**: 特定のkintoneアプリ専用のカスタマイズを開発する場合
-**特徴**: 事前にフィールド構成がわかっているため、型安全に開発できる
+**Target**: When developing customizations for a specific kintone app
+**Feature**: Type-safe development since field configuration is known in advance
 
-📖 **詳細なガイドは [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md) を参照してください**
+📖 **For detailed guide, see [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md)**
 
-#### 1. 事前準備（CLIでスキーマ生成）
+#### 1. Preparation (Generate Schema with CLI)
 
 ```bash
-# 営業管理アプリ（ID: 123）のスキーマを生成
+# Generate schema for Sales Management App (ID: 123)
 npx kintone-query-gen generate \
   --domain your-domain.cybozu.com \
   --app-id 123 \
@@ -330,32 +332,32 @@ npx kintone-query-gen generate \
   --output ./src/schemas
 ```
 
-#### 2. 型安全なカスタマイズ開発
+#### 2. Type-safe Customization Development
 
 ```typescript
 // sales-customize.ts
 import { kintoneQuery, TODAY, LOGINUSER } from 'kintone-functional-query';
-import { SalesApp } from './schemas/sales-app-schema';  // CLIで生成された型
+import { SalesApp } from './schemas/sales-app-schema';  // CLI-generated type
 
 kintone.events.on('app.record.index.show', (event) => {
-  // 型安全！IDEでフィールド名が補完される
+  // Type-safe! IDE auto-completes field names
   const myUrgentDeals = kintoneQuery<SalesApp>(r =>
-    r.担当者.in([LOGINUSER()]) &&
-    r.確度.greaterThanOrEqual(70) &&
-    r.次回アクション日.lessThanOrEqual(TODAY()) &&
-    r.ステータス.notEquals("失注")
+    r.SalesRep.in([LOGINUSER()]) &&
+    r.Probability.greaterThanOrEqual(70) &&
+    r.NextActionDate.lessThanOrEqual(TODAY()) &&
+    r.Status.notEquals("Lost")
   )
-    .orderBy('見込み金額', 'desc')
+    .orderBy('ExpectedAmount', 'desc')
     .limit(10)
     .build();
   
-  // ボタンを追加
-  const button = createButton('要対応案件', async () => {
+  // Add button
+  const button = createButton('Action Required Deals', async () => {
     const records = await kintone.app.getRecords({
       app: kintone.app.getId(),
       query: myUrgentDeals
     });
-    showModal(`${records.length}件の要対応案件があります`);
+    showModal(`${records.length} deals require action`);
   });
   
   kintone.app.getHeaderSpaceElement().appendChild(button);
@@ -363,53 +365,53 @@ kintone.events.on('app.record.index.show', (event) => {
 });
 ```
 
-**メリット**:
-- 🔒 コンパイル時にエラーを検出（フィールド名のtypoなど）
-- 📝 IDEの補完機能でフィールド名や型が自動表示
-- 🚀 リファクタリングが安全（フィールド名変更時も追跡可能）
-- 📖 コードが読みやすく、メンテナンスしやすい
+**Benefits**:
+- 🔒 Compile-time error detection (field name typos, etc.)
+- 📝 IDE auto-completion for field names and types
+- 🚀 Safe refactoring (trackable when field names change)
+- 📖 Readable and maintainable code
 
-### B. 汎用プラグイン開発
+### B. Universal Plugin Development
 
-**対象**: 複数のアプリで動作する汎用的なプラグインを開発する場合
-**特徴**: 実行時にフィールド情報を取得して動的に処理する必要がある
+**Target**: When developing universal plugins that work across multiple apps
+**Feature**: Need to dynamically process based on runtime field information
 
-#### 1. フィールド情報の動的取得と検証
+#### 1. Dynamic Field Information Retrieval and Validation
 
 ```typescript
 import { kintoneQuery, FormFieldsResponse, S, FieldTypes } from 'kintone-functional-query';
 
-// 汎用検索プラグインの実装例
+// Universal search plugin implementation example
 class UniversalSearchPlugin {
   private formFields: FormFieldsResponse;
   
   async initialize() {
     try {
-      // どのアプリでも動作するよう、実行時にフィールド情報を取得
+      // Get field information at runtime to work with any app
       const fieldsData = await kintone.app.getFormFields();
       this.formFields = S.decodeUnknownSync(FormFieldsResponse)(fieldsData);
       
-      // アプリに応じた検索UIを動的に生成
+      // Dynamically generate search UI based on app
       this.renderSearchInterface();
     } catch (error) {
-      console.error('プラグイン初期化エラー:', error);
-      this.showError('このアプリではプラグインを使用できません');
+      console.error('Plugin initialization error:', error);
+      this.showError('Cannot use plugin with this app');
     }
   }
   
-  // フィールドタイプを判定して適切な検索UIを生成
+  // Generate appropriate search UI based on field type
   private renderSearchInterface() {
     const searchableFields = this.getSearchableFields();
     const container = this.createSearchContainer();
     
     searchableFields.forEach(([fieldCode, fieldInfo]) => {
-      // フィールドタイプに応じた入力UI生成
+      // Generate input UI based on field type
       const inputElement = this.createSearchInput(fieldCode, fieldInfo);
       container.appendChild(inputElement);
     });
   }
   
-  // 動的にクエリを構築（フィールド名は実行時に決定）
+  // Build query dynamically (field names determined at runtime)
   buildDynamicQuery(searchParams: Record<string, any>): string {
     return kintoneQuery(r => {
       const conditions = [];
@@ -418,7 +420,7 @@ class UniversalSearchPlugin {
         const fieldInfo = this.formFields.properties[fieldCode];
         if (!fieldInfo || !value) return;
         
-        // フィールドタイプに応じた条件生成
+        // Generate conditions based on field type
         switch (fieldInfo.type) {
           case FieldTypes.SINGLE_LINE_TEXT:
           case FieldTypes.MULTI_LINE_TEXT:
@@ -451,17 +453,17 @@ class UniversalSearchPlugin {
       
       return conditions.length > 0 
         ? conditions.reduce((a, b) => a && b)
-        : true;  // 条件なし = 全件
+        : true;  // No conditions = all records
     }).build();
   }
 }
 
-// プラグインの使用例
+// Plugin usage example
 kintone.events.on(['app.record.index.show'], async (event) => {
   const plugin = new UniversalSearchPlugin();
   await plugin.initialize();
   
-  // 検索実行ボタン
+  // Search execution button
   document.getElementById('plugin-search-btn').onclick = async () => {
     const searchParams = plugin.collectSearchParams();
     const query = plugin.buildDynamicQuery(searchParams);
@@ -478,23 +480,23 @@ kintone.events.on(['app.record.index.show'], async (event) => {
 });
 ```
 
-#### 2. エラーハンドリングとフォールバック
+#### 2. Error Handling and Fallback
 
 ```typescript
 import { Effect as E, pipe } from 'kintone-functional-query';
 
-// 汎用プラグインでの安全なフィールド情報取得
+// Safe field information retrieval in universal plugins
 class SafeFieldManager {
   static async getFields() {
     return pipe(
       E.tryPromise(() => kintone.app.getFormFields()),
       E.flatMap(S.decodeUnknown(FormFieldsResponse)),
       E.tap(fields => 
-        E.sync(() => console.log(`${Object.keys(fields.properties).length}個のフィールドを検出`))
+        E.sync(() => console.log(`Detected ${Object.keys(fields.properties).length} fields`))
       ),
       E.catchAll(error => {
-        console.error('フィールド情報の取得に失敗:', error);
-        // 最小限の機能で動作を継続
+        console.error('Failed to get field information:', error);
+        // Continue operation with minimal functionality
         return E.succeed({
           properties: {},
           revision: '0'
@@ -503,7 +505,7 @@ class SafeFieldManager {
     );
   }
   
-  // フィールドタイプの安全な判定
+  // Safe field type determination
   static isSearchable(field: any): boolean {
     const searchableTypes = [
       FieldTypes.SINGLE_LINE_TEXT,
@@ -517,48 +519,48 @@ class SafeFieldManager {
 }
 ```
 
-**メリット**:
-- 🌍 どのアプリでも動作する汎用性
-- 🔧 実行時の柔軟な対応
-- 🛡️ 未知のフィールドタイプにも対処可能
-- 📦 一度作れば複数のアプリで再利用可能
+**Benefits**:
+- 🌍 Universal functionality across any app
+- 🔧 Flexible runtime handling
+- 🛡️ Can handle unknown field types
+- 📦 Create once, reuse across multiple apps
 
-**デメリット**:
-- ⚠️ 実行時までエラーがわからない
-- 🔍 IDEの補完が効かない
-- 🐛 デバッグが難しい
-- 📚 コードが複雑になりがち
+**Drawbacks**:
+- ⚠️ Errors not known until runtime
+- 🔍 No IDE auto-completion
+- 🐛 Harder to debug
+- 📚 Code tends to be complex
 
-### 使い分けの指針
+### Usage Guidelines
 
-| ケース | 推奨アプローチ | 理由 |
-|--------|--------------|------|
-| 自社の特定アプリ用カスタマイズ | A. 型安全な開発 | フィールドが事前にわかるため |
-| 顧客納品用のカスタマイズ | A. 型安全な開発 | 品質保証が重要なため |
-| kintoneアプリストアのプラグイン | B. 汎用開発 | 不特定多数のアプリで動作する必要があるため |
-| 複数部署で使う社内ツール | B. 汎用開発 | 各部署のアプリ構成が異なるため |
+| Case | Recommended Approach | Reason |
+|------|---------------------|--------|
+| Company-specific app customization | A. Type-safe development | Field configuration known in advance |
+| Customer-delivered customization | A. Type-safe development | Quality assurance is important |
+| kintone App Store plugin | B. Universal development | Must work with unspecified apps |
+| Internal tool for multiple departments | B. Universal development | Different app configurations per department |
 
-詳細な実装例は [動的クエリビルダーガイド](FRONTEND_GUIDE.md) を参照してください。
+For detailed implementation examples, see [Dynamic Query Builder Guide](FRONTEND_GUIDE.md).
 
-## 開発
+## Development
 
 ```bash
-# 依存関係のインストール
+# Install dependencies
 npm install
 
-# テスト
+# Test
 npm test
 
-# ビルド
+# Build
 npm run build
 
-# 型チェック
+# Type check
 npm run typecheck
 
 # Lint
 npm run lint
 ```
 
-## ライセンス
+## License
 
 MIT
