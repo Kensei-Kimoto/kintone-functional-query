@@ -1,6 +1,6 @@
 {
   "name": "kintone-functional-query",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Type-safe functional query builder for kintone with CLI schema generator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -33,16 +33,16 @@
     "codegen",
     "effect"
   ],
-  "author": "kimotokensei",
+  "author": "Kensei-Kimoto",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kimotokensei/kintone-functional-query.git"
+    "url": "git+https://github.com/Kensei-Kimoto/kintone-functional-query.git"
   },
   "bugs": {
-    "url": "https://github.com/kimotokensei/kintone-functional-query/issues"
+    "url": "https://github.com/Kensei-Kimoto/kintone-functional-query/issues"
   },
-  "homepage": "https://github.com/kimotokensei/kintone-functional-query#readme",
+  "homepage": "https://github.com/Kensei-Kimoto/kintone-functional-query#readme",
   "dependencies": {
     "@effect/cli": "^0.49.0",
     "@effect/platform": "^0.70.0",
