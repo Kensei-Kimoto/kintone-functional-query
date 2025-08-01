@@ -2,7 +2,7 @@ import { Effect as E, pipe } from 'effect';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Schema as S } from 'effect';
 import prettier from 'prettier';
-import { FormFieldsResponse, FieldDefinition } from '@kintone-functional-query/core';
+import { FormFieldsResponse, FieldDefinition, FieldDefinitionInterface } from '@kintone-functional-query/core';
 import { fieldTypeMapping, effectSchemaMapping, GeneratorConfig } from './types';
 
 export class SchemaGenerator {
@@ -29,7 +29,7 @@ export class SchemaGenerator {
   ): E.Effect<string, Error> {
     return E.tryPromise({
       try: async () => {
-      const fields = Object.entries(formFields.properties) as Array<[string, FieldDefinition]>;
+      const fields = Object.entries(formFields.properties) as Array<[string, FieldDefinitionInterface]>;
       
       // インポート文を生成
       const imports = this.generateImports(fields);
@@ -45,7 +45,7 @@ export class SchemaGenerator {
         if (field.type === 'SUBTABLE' && field.fields) {
           // サブテーブルの処理
           const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+            if (typeof subField === 'object' && subField !== null && 'type' in subField && typeof subField.type === 'string') {
               const subSchemaType = effectSchemaMapping[subField.type];
               return `    ${subCode}: ${subSchemaType || 'S.Unknown'},`;
             }
@@ -87,7 +87,7 @@ export type ${schemaName} = S.Schema.Type<typeof ${schemaName}Schema>;
   ): E.Effect<string, Error> {
     return E.tryPromise({
       try: async () => {
-      const fields = Object.entries(formFields.properties) as Array<[string, FieldDefinition]>;
+      const fields = Object.entries(formFields.properties) as Array<[string, FieldDefinitionInterface]>;
       
       // 型定義
       const fieldTypes = fields.map(([code, field]) => {
@@ -99,7 +99,7 @@ export type ${schemaName} = S.Schema.Type<typeof ${schemaName}Schema>;
         if (field.type === 'SUBTABLE' && field.fields) {
           // サブテーブルの型定義
           const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+            if (typeof subField === 'object' && subField !== null && 'type' in subField && typeof subField.type === 'string') {
               const subTsType = fieldTypeMapping[subField.type] || 'unknown';
               return `    ${subCode}: ${subTsType};`;
             }
@@ -134,7 +134,7 @@ ${this.generateSubtableTypes(fields)}
     });
   }
 
-  private generateImports(fields: Array<[string, FieldDefinition]>): string {
+  private generateImports(fields: Array<[string, FieldDefinitionInterface]>): string {
     const usedSchemas = new Set<string>();
     
     fields.forEach(([_, field]) => {
@@ -166,7 +166,7 @@ import {
 `;
   }
 
-  private generateSubtableTypes(fields: Array<[string, FieldDefinition]>): string {
+  private generateSubtableTypes(fields: Array<[string, FieldDefinitionInterface]>): string {
     const subtables = fields.filter(([_, field]) => field.type === 'SUBTABLE');
     
     return subtables.map(([code, field]) => {
