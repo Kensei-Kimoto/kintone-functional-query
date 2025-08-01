@@ -2,7 +2,7 @@ import { Effect as E, pipe } from 'effect';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Schema as S } from 'effect';
 import prettier from 'prettier';
-import { FormFieldsResponse, FieldDefinitionInterface } from 'kintone-functional-query';
+import { FormFieldsResponse, FieldDefinitionInterface } from '../../schemas';
 import { fieldTypeMapping, effectSchemaMapping, GeneratorConfig } from './types';
 
 export class SchemaGenerator {

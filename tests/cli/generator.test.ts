@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Effect as E } from 'effect';
-import { SchemaGenerator } from '../src/generator';
+import { SchemaGenerator } from '../../src/cli/generator';
 
 describe('Schema Generator', () => {
   const generator = new SchemaGenerator({ schemaName: 'TestSchema' });

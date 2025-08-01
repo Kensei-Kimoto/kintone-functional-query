@@ -1,7 +1,7 @@
 import { Effect as E, Console, pipe } from 'effect';
 import { HttpClient, HttpClientRequest, HttpClientResponse, FetchHttpClient } from '@effect/platform';
 import { Schema as S } from 'effect';
-import { FormFieldsResponse } from 'kintone-functional-query';
+import { FormFieldsResponse } from '../../schemas';
 
 // エラー型
 export class KintoneApiError extends S.TaggedError<KintoneApiError>()(

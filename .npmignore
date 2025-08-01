@@ -6,6 +6,8 @@ tests/
 tsconfig.json
 vitest.config.ts
 .eslintrc.json
+.eslintignore
+.prettierrc
 
 # 開発用ファイル
 *.ts
@@ -16,8 +18,18 @@ vitest.config.ts
 coverage/
 .nyc_output/
 
+# GitHub
+.github/
+.changeset/
+
+# ドキュメント
+*.md
+!README.md
+
 # その他
 .DS_Store
 .vscode/
 .idea/
 *.log
+package.json.old
+pnpm-lock.yaml

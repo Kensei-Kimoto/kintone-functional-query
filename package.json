@@ -1,11 +1,40 @@
 {
   "name": "kintone-functional-query",
-  "version": "0.1.0",
-  "private": true,
-  "workspaces": [
-    "packages/*"
+  "version": "0.1.1",
+  "description": "Type-safe functional query builder for kintone with CLI schema generator",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "kintone-query-gen": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "dev": "vitest --watch",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "changeset": "changeset"
+  },
+  "keywords": [
+    "kintone",
+    "query",
+    "typescript",
+    "functional",
+    "cli",
+    "codegen",
+    "effect"
   ],
   "author": "kimotokensei",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kimotokensei/kintone-functional-query.git"
@@ -14,17 +43,26 @@
     "url": "https://github.com/kimotokensei/kintone-functional-query/issues"
   },
   "homepage": "https://github.com/kimotokensei/kintone-functional-query#readme",
-  "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "format": "pnpm -r format",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+  "dependencies": {
+    "@effect/cli": "^0.45.0",
+    "@effect/platform": "^0.69.0",
+    "@effect/platform-node": "^0.63.0",
+    "effect": "^3.0.0",
+    "prettier": "^3.0.0"
+  },
+  "peerDependencies": {
+    "kintone-effect-schema": "*"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.27.0"
+    "@changesets/cli": "^2.27.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
   }
 }

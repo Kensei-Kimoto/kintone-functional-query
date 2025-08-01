@@ -1,0 +1,30 @@
+{
+  "name": "kintone-functional-query",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "author": "kimotokensei",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimotokensei/kintone-functional-query.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kimotokensei/kintone-functional-query/issues"
+  },
+  "homepage": "https://github.com/kimotokensei/kintone-functional-query#readme",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "format": "pnpm -r format",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0"
+  }
+}

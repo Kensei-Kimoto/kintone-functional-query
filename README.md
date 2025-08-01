@@ -6,12 +6,12 @@
 
 Type-safe functional query builder for kintone
 
-## パッケージ
+## 機能
 
-このプロジェクトはmonorepo構造になっています：
-
-- **kintone-functional-query**: クエリビルダーのコアライブラリ
-- **kintone-functional-query-cli**: スキーマ生成用CLIツール
+- **クエリビルダー**: ラムダ式で型安全なkintoneクエリを構築
+- **CLIツール**: kintone APIからEffect Schemaを自動生成
+- **完全な型サポート**: TypeScriptの型システムを最大限活用
+- **全演算子対応**: kintoneのすべてのクエリ演算子をサポート
 
 ## 概要
 
@@ -27,11 +27,7 @@ kintone-functional-queryは、kintoneのクエリをラムダ式で型安全に�
 ## インストール
 
 ```bash
-# コアライブラリ
 npm install kintone-functional-query
-
-# CLIツール（開発時のみ）
-npm install -D kintone-functional-query-cli
 ```
 
 ## 使用例
