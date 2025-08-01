@@ -45,8 +45,11 @@ export class SchemaGenerator {
         if (field.type === 'SUBTABLE' && field.fields) {
           // サブテーブルの処理
           const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            const subSchemaType = effectSchemaMapping[subField.type];
-            return `    ${subCode}: ${subSchemaType || 'S.Unknown'},`;
+            if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+              const subSchemaType = effectSchemaMapping[subField.type];
+              return `    ${subCode}: ${subSchemaType || 'S.Unknown'},`;
+            }
+            return `    ${subCode}: S.Unknown,`;
           }).join('\n');
           
           return `  ${code}: SubtableFieldSchema(S.Struct({\n${subFields}\n  })),`;
@@ -96,8 +99,11 @@ export type ${schemaName} = S.Schema.Type<typeof ${schemaName}Schema>;
         if (field.type === 'SUBTABLE' && field.fields) {
           // サブテーブルの型定義
           const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            const subTsType = fieldTypeMapping[subField.type] || 'unknown';
-            return `    ${subCode}: ${subTsType};`;
+            if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+              const subTsType = fieldTypeMapping[subField.type] || 'unknown';
+              return `    ${subCode}: ${subTsType};`;
+            }
+            return `    ${subCode}: unknown;`;
           }).join('\n');
           
           return `  ${code}: Array<{\n${subFields}\n  }>;`;
@@ -140,9 +146,11 @@ ${this.generateSubtableTypes(fields)}
       // サブテーブル内のフィールドも確認
       if (field.type === 'SUBTABLE' && field.fields) {
         Object.values(field.fields).forEach((subField) => {
-          const subSchemaType = effectSchemaMapping[subField.type];
-          if (subSchemaType && subSchemaType !== 'S.Unknown') {
-            usedSchemas.add(subSchemaType);
+          if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+            const subSchemaType = effectSchemaMapping[subField.type];
+            if (subSchemaType && subSchemaType !== 'S.Unknown') {
+              usedSchemas.add(subSchemaType);
+            }
           }
         });
       }
@@ -165,8 +173,11 @@ import {
       if (!field.fields) return '';
       
       const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-        const tsType = fieldTypeMapping[subField.type] || 'unknown';
-        return `  ${subCode}: ${tsType};`;
+        if (typeof subField === 'object' && subField !== null && 'type' in subField) {
+          const tsType = fieldTypeMapping[subField.type] || 'unknown';
+          return `  ${subCode}: ${tsType};`;
+        }
+        return `  ${subCode}: unknown;`;
       }).join('\n');
       
       return `export interface ${code}Row {\n${subFields}\n}`;
