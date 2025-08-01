@@ -44,10 +44,10 @@
   },
   "homepage": "https://github.com/kimotokensei/kintone-functional-query#readme",
   "dependencies": {
-    "@effect/cli": "^0.45.0",
-    "@effect/platform": "^0.69.0",
-    "@effect/platform-node": "^0.63.0",
-    "effect": "^3.0.0",
+    "@effect/cli": "^0.49.0",
+    "@effect/platform": "^0.70.0",
+    "@effect/platform-node": "^0.65.0",
+    "effect": "^3.11.0",
     "prettier": "^3.0.0"
   },
   "peerDependencies": {
