@@ -310,6 +310,79 @@ const advancedQuery = kintoneQuery<App>(r =>
 - Use parentheses explicitly to ensure intended precedence
 - Generated queries will have all logical operations properly parenthesized
 
+## Query Parser
+
+Parse existing kintone query strings into AST (Abstract Syntax Tree) for analysis and manipulation.
+
+### Basic Usage
+
+```typescript
+import { parseKintoneQuery } from 'kintone-functional-query';
+
+// Parse a query string
+const query = 'Status = "Open" and Priority > 5';
+const ast = parseKintoneQuery(query);
+
+console.log(ast);
+// {
+//   type: "and",
+//   left: { field: "Status", operator: "=", value: "Open" },
+//   right: { field: "Priority", operator: ">", value: 5 }
+// }
+```
+
+### Advanced Examples
+
+```typescript
+// Parse complex queries with functions
+const complexQuery = '(Status = "Open" or Status = "Pending") and DueDate <= FROM_TODAY(7, "DAYS")';
+const ast = parseKintoneQuery(complexQuery);
+
+// Extract field names from AST
+function extractFields(expr) {
+  const fields = [];
+  function traverse(node) {
+    if ('field' in node) {
+      fields.push(node.field);
+    } else if (node.type === 'and' || node.type === 'or') {
+      traverse(node.left);
+      traverse(node.right);
+    }
+  }
+  traverse(expr);
+  return [...new Set(fields)];
+}
+
+console.log(extractFields(ast)); // ["Status", "DueDate"]
+
+// Modify conditions in AST
+function modifyFieldValue(expr, targetField, newValue) {
+  if ('field' in expr && expr.field === targetField) {
+    return { ...expr, value: newValue };
+  } else if (expr.type === 'and' || expr.type === 'or') {
+    return {
+      ...expr,
+      left: modifyFieldValue(expr.left, targetField, newValue),
+      right: modifyFieldValue(expr.right, targetField, newValue)
+    };
+  }
+  return expr;
+}
+
+const modifiedAst = modifyFieldValue(ast, 'Status', 'Closed');
+```
+
+### Supported Query Syntax
+
+The parser supports all kintone query syntax including:
+- All comparison operators (`=`, `!=`, `>`, `<`, `>=`, `<=`)
+- Array operators (`in`, `not in`)
+- String operators (`like`, `not like`)
+- Empty checks (`is empty`, `is not empty`)
+- Logical operators (`and`, `or`)
+- Functions (e.g., `TODAY()`, `LOGINUSER()`, `FROM_TODAY()`)
+- Subtable fields (e.g., `Table.Field`)
+
 ## Frontend Usage
 
 For frontend usage (kintone customizations/plugins), there are two approaches depending on what you're developing.

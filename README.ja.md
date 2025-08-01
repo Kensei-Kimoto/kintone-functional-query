@@ -308,6 +308,79 @@ const advancedQuery = kintoneQuery<App>(r =>
 - 明示的に括弧を使用することで、意図した優先順位を確実に指定できます
 - 生成されるクエリでは、すべての論理演算が適切に括弧で囲まれます
 
+## クエリパーサー
+
+既存のkintoneクエリ文字列をAST（抽象構文木）にパースして、解析や操作を可能にします。
+
+### 基本的な使い方
+
+```typescript
+import { parseKintoneQuery } from 'kintone-functional-query';
+
+// クエリ文字列をパース
+const query = 'Status = "Open" and Priority > 5';
+const ast = parseKintoneQuery(query);
+
+console.log(ast);
+// {
+//   type: "and",
+//   left: { field: "Status", operator: "=", value: "Open" },
+//   right: { field: "Priority", operator: ">", value: 5 }
+// }
+```
+
+### 高度な使用例
+
+```typescript
+// 関数を含む複雑なクエリをパース
+const complexQuery = '(Status = "Open" or Status = "Pending") and DueDate <= FROM_TODAY(7, "DAYS")';
+const ast = parseKintoneQuery(complexQuery);
+
+// ASTからフィールド名を抽出
+function extractFields(expr) {
+  const fields = [];
+  function traverse(node) {
+    if ('field' in node) {
+      fields.push(node.field);
+    } else if (node.type === 'and' || node.type === 'or') {
+      traverse(node.left);
+      traverse(node.right);
+    }
+  }
+  traverse(expr);
+  return [...new Set(fields)];
+}
+
+console.log(extractFields(ast)); // ["Status", "DueDate"]
+
+// AST内の条件を変更
+function modifyFieldValue(expr, targetField, newValue) {
+  if ('field' in expr && expr.field === targetField) {
+    return { ...expr, value: newValue };
+  } else if (expr.type === 'and' || expr.type === 'or') {
+    return {
+      ...expr,
+      left: modifyFieldValue(expr.left, targetField, newValue),
+      right: modifyFieldValue(expr.right, targetField, newValue)
+    };
+  }
+  return expr;
+}
+
+const modifiedAst = modifyFieldValue(ast, 'Status', 'Closed');
+```
+
+### サポートされているクエリ構文
+
+パーサーは以下を含むすべてのkintoneクエリ構文をサポートしています：
+- すべての比較演算子（`=`, `!=`, `>`, `<`, `>=`, `<=`）
+- 配列演算子（`in`, `not in`）
+- 文字列演算子（`like`, `not like`）
+- 空チェック（`is empty`, `is not empty`）
+- 論理演算子（`and`, `or`）
+- 関数（例：`TODAY()`, `LOGINUSER()`, `FROM_TODAY()`）
+- サブテーブルフィールド（例：`Table.Field`）
+
 ## フロントエンドでの使用
 
 フロントエンド（kintoneカスタマイズ・プラグイン）での使用方法は、開発するものによって2つのアプローチがあります。
