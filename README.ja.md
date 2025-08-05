@@ -12,6 +12,8 @@ Type-safe functional query builder for kintone
 - **CLIツール**: kintone APIからEffect Schemaを自動生成
 - **完全な型サポート**: TypeScriptの型システムを最大限活用
 - **全演算子対応**: kintoneのすべてのクエリ演算子をサポート
+- **実行時バリデーション**: Effect-TSによるスキーマベース検証で安全性を向上
+- **構造化ログ**: デバッグと監視のための高度なログシステム
 
 ## 概要
 
@@ -23,6 +25,8 @@ kintone-functional-queryは、kintoneのクエリをラムダ式で型安全に�
 - ✨ **直感的**: ラムダ式による自然な記述
 - 🚀 **補完対応**: IDEの自動補完で快適な開発体験
 - 🔧 **柔軟**: 演算子、関数、order by、limit、offsetをサポート
+- 🛡️ **実行時検証**: Effect-TS駆動のスキーマ検証で安全性を向上
+- 📊 **高度なログ**: デバッグ用の構造化ログとコンテキスト情報
 
 ## インストール
 
@@ -612,6 +616,61 @@ class SafeFieldManager {
 | 複数部署で使う社内ツール | B. 汎用開発 | 各部署のアプリ構成が異なるため |
 
 詳細な実装例は [動的クエリビルダーガイド](FRONTEND_GUIDE.md) を参照してください。
+
+## 高度な機能
+
+### Effect-TSによる実行時バリデーション
+
+ライブラリはクエリ式の実行時バリデーション機能を提供します：
+
+```typescript
+import { kintoneQuery, Logger } from 'kintone-functional-query';
+
+// デバッグログを有効化
+process.env.DEBUG = 'true';
+
+const query = kintoneQuery<App>(r => 
+  r.ステータス.equals('Active') &&
+  r.優先度.greaterThan('invalid-number') // これは検証警告をログ出力
+).build();
+
+// 検証警告は構造化されたコンテキストと共にログ出力される：
+// [kintone-query:WARN] Expression validation failed: Expected number, actual "invalid-number" 
+// (module=proxy function=createValidatedExpression field=優先度 operator=>)
+```
+
+### 高度なログ機能
+
+```typescript
+import { Logger } from 'kintone-functional-query';
+
+// コンテキスト付きのカスタムログ
+Logger.warn('カスタム検証が失敗しました', {
+  module: 'my-module',
+  function: 'validateInput',
+  field: '顧客名',
+  value: userInput
+});
+
+// 構造化ログは自動的にモジュール、関数、フィールド情報を含みます
+```
+
+### 関数引数の検証
+
+日付関数は厳密な引数検証を持つようになりました：
+
+```typescript
+import { FROM_TODAY } from 'kintone-functional-query';
+
+// 有効な使用例
+FROM_TODAY(7, 'DAYS');    // ✅ 有効
+FROM_TODAY(-30);          // ✅ 有効
+
+// 無効な使用例（検証エラーをスロー）
+FROM_TODAY(500);          // ❌ 範囲外 (-365 から 365)
+FROM_TODAY(5, 'HOURS');   // ❌ 無効な単位 (DAYS/WEEKS/MONTHS/YEARS が必要)
+FROM_TODAY('not-number'); // ❌ 無効な型 (数値が必要)
+```
 
 ## 開発
 

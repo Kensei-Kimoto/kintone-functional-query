@@ -1,4 +1,6 @@
-import { Expression, QueryExpression, LogicalExpression, FunctionCall, KintoneOperator, KintoneFunction } from './types';
+import { Expression, QueryExpression, LogicalExpression, FunctionCall, KintoneOperator, KintoneFunction, QueryExpressionSchema } from './types';
+import { Schema as S } from 'effect';
+import { logValidationWarning } from './utils/logger';
 
 /**
  * kintoneクエリ文字列をASTに変換するパーサー
@@ -6,6 +8,23 @@ import { Expression, QueryExpression, LogicalExpression, FunctionCall, KintoneOp
 export class KintoneQueryParser {
   private pos = 0;
   private input = '';
+  
+  private validateQueryExpression(expr: Omit<QueryExpression, 'operator'> & { operator: string }): QueryExpression {
+    try {
+      // Effect-TSスキーマでの検証
+      const decoded = S.decodeUnknownSync(QueryExpressionSchema)(expr);
+      return decoded;
+    } catch (error) {
+      // 検証エラーの場合は警告を出して元の値を返す（後方互換性のため）
+      logValidationWarning('Query expression validation failed', error, {
+        module: 'query-parser',
+        function: 'validateQueryExpression',
+        field: expr.field,
+        operator: expr.operator
+      });
+      return expr as QueryExpression;
+    }
+  }
   
   /**
    * kintoneクエリ文字列をパースしてASTを生成
@@ -94,11 +113,11 @@ export class KintoneQueryParser {
       value = this.parseValue();
     }
     
-    return {
+    return this.validateQueryExpression({
       field,
       operator,
       value
-    };
+    });
   }
   
   /**

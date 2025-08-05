@@ -1,10 +1,11 @@
 export { QueryBuilder } from './builder';
 export * from './types';
 export * from './functions';
-export { subTable } from './subtable-builder';
 export * from './schemas';
 export { Schema as S } from 'effect';
 export { KintoneQueryParser } from './query-parser';
+export { Logger, type LogContext, type LogLevel } from './utils/logger';
+export { FieldReference, createRecordProxy } from './proxy';
 
 import { QueryBuilder } from './builder';
 import * as functions from './functions';

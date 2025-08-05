@@ -1,10 +1,29 @@
-import { Expression, LogicalExpression, NotExpression, QueryExpression } from './types';
+import { Expression, LogicalExpression, NotExpression, QueryExpression, QueryExpressionSchema } from './types';
+import { Schema as S } from 'effect';
+import { logValidationWarning, logCompatibilityWarning } from './utils/logger';
 
 export class QueryParser {
   private readonly funcBody: string;
 
   constructor(private readonly lambdaFunc: (...args: unknown[]) => unknown) {
     this.funcBody = lambdaFunc.toString();
+  }
+
+  private validateQueryExpression(expr: Omit<QueryExpression, 'operator'> & { operator: string }): QueryExpression {
+    try {
+      // Effect-TSスキーマでの検証
+      const decoded = S.decodeUnknownSync(QueryExpressionSchema)(expr);
+      return decoded;
+    } catch (error) {
+      // 検証エラーの場合は警告を出して元の値を返す（後方互換性のため）
+      logValidationWarning('Query expression validation failed', error, {
+        module: 'parser',
+        function: 'validateQueryExpression',
+        field: expr.field,
+        operator: expr.operator
+      });
+      return expr as QueryExpression;
+    }
   }
 
   parse(): Expression | null {
@@ -97,11 +116,11 @@ export class QueryParser {
     );
     if (subTableEmptyMethodMatch) {
       const [, tableName, fieldName, method] = subTableEmptyMethodMatch;
-      return {
+      return this.validateQueryExpression({
         field: `${tableName}.${fieldName}`,
         operator: this.convertMethod(method),
         value: null,
-      } as QueryExpression;
+      });
     }
     
     // 引数なしメソッドのチェック（isEmpty, isNotEmpty）
@@ -110,11 +129,11 @@ export class QueryParser {
     );
     if (emptyMethodMatch) {
       const [, field, method] = emptyMethodMatch;
-      return {
+      return this.validateQueryExpression({
         field,
         operator: this.convertMethod(method),
         value: null,
-      } as QueryExpression;
+      });
     }
 
     // サブテーブルのメソッド呼び出しのチェック
@@ -126,14 +145,24 @@ export class QueryParser {
       
       // サブテーブルで比較演算子を使用する場合は警告を出す
       if (['greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual'].includes(method)) {
-        console.warn(`警告: サブテーブルのフィールド "${fieldName}" での比較演算子の使用は制限される場合があります`);
+        logCompatibilityWarning(
+          `サブテーブルのフィールド "${fieldName}" での比較演算子の使用は制限される場合があります`,
+          'kintone公式ドキュメントで対応状況を確認してください',
+          {
+            module: 'parser',
+            function: 'parseExpression',
+            field: fieldName,
+            operator: method,
+            table: tableName
+          }
+        );
       }
       
-      return {
+      return this.validateQueryExpression({
         field: `${tableName}.${fieldName}`,
         operator: this.convertMethod(method),
         value: this.parseMethodArgs(method, args),
-      } as QueryExpression;
+      });
     }
     
     // メソッド呼び出しのチェック（equals, notEquals, greaterThan等）
@@ -142,22 +171,22 @@ export class QueryParser {
     );
     if (methodMatch) {
       const [, field, method, args] = methodMatch;
-      return {
+      return this.validateQueryExpression({
         field: field,
         operator: this.convertMethod(method),
         value: this.parseMethodArgs(method, args),
-      } as QueryExpression;
+      });
     }
 
     // 比較演算子のチェック（後方互換性のため）
     const comparisonMatch = expr.match(/^r\.([^\s]+)\s*(===|!==|>=|<=|>|<)\s*(.+)$/);
     if (comparisonMatch) {
       const [, field, operator, value] = comparisonMatch;
-      return {
+      return this.validateQueryExpression({
         field,
         operator: this.convertOperator(operator),
         value: this.parseValue(value),
-      } as QueryExpression;
+      });
     }
 
     return null;

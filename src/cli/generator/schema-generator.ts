@@ -4,6 +4,7 @@ import { Schema as S } from 'effect';
 import prettier from 'prettier';
 import { FormFieldsResponse, FieldDefinitionInterface } from '../../schemas';
 import { fieldTypeMapping, effectSchemaMapping, GeneratorConfig } from './types';
+import { Logger } from '../../utils/logger';
 
 export class SchemaGenerator {
   constructor(private readonly config: GeneratorConfig) {}
@@ -38,21 +39,19 @@ export class SchemaGenerator {
       const fieldSchemas = fields.map(([code, field]) => {
         const schemaType = effectSchemaMapping[field.type];
         if (!schemaType) {
-          console.warn(`Unknown field type: ${field.type} for field: ${code}`);
+          Logger.warn('Unknown field type encountered', {
+            module: 'schema-generator',
+            function: 'generateSchema',
+            fieldCode: code,
+            fieldType: field.type,
+            fieldLabel: field.label
+          });
           return `  // ${code}: ${field.type} - Not supported yet`;
         }
         
-        if (field.type === 'SUBTABLE' && field.fields) {
-          // サブテーブルの処理
-          const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            if (typeof subField === 'object' && subField !== null && 'type' in subField && typeof subField.type === 'string') {
-              const subSchemaType = effectSchemaMapping[subField.type];
-              return `    ${subCode}: ${subSchemaType || 'S.Unknown'},`;
-            }
-            return `    ${subCode}: S.Unknown,`;
-          }).join('\n');
-          
-          return `  ${code}: SubtableFieldSchema(S.Struct({\n${subFields}\n  })),`;
+        if (field.type === 'SUBTABLE') {
+          // サブテーブルはkintone-effect-schemaのSubtableFieldSchemaを直接使用
+          return `  ${code}: ${schemaType},`;
         }
         
         return `  ${code}: ${schemaType},`;
@@ -96,20 +95,13 @@ export type ${schemaName} = S.Schema.Type<typeof ${schemaName}Schema>;
           return `  // ${code}: ${field.type} - Not supported yet`;
         }
         
-        if (field.type === 'SUBTABLE' && field.fields) {
-          // サブテーブルの型定義
-          const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-            if (typeof subField === 'object' && subField !== null && 'type' in subField && typeof subField.type === 'string') {
-              const subTsType = fieldTypeMapping[subField.type] || 'unknown';
-              return `    ${subCode}: ${subTsType};`;
-            }
-            return `    ${subCode}: unknown;`;
-          }).join('\n');
-          
-          return `  ${code}: Array<{\n${subFields}\n  }>;`;
+        const optional = field.required ? '' : '?';
+        
+        if (field.type === 'SUBTABLE') {
+          // サブテーブルは標準的な型定義を使用
+          return `  ${code}${optional}: Array<Record<string, unknown>>;`;
         }
         
-        const optional = field.required ? '' : '?';
         return `  ${code}${optional}: ${tsType};`;
       });
       
@@ -142,18 +134,6 @@ ${this.generateSubtableTypes(fields)}
       if (schemaType && schemaType !== 'S.Unknown') {
         usedSchemas.add(schemaType);
       }
-      
-      // サブテーブル内のフィールドも確認
-      if (field.type === 'SUBTABLE' && field.fields) {
-        Object.values(field.fields).forEach((subField) => {
-          if (typeof subField === 'object' && subField !== null && 'type' in subField) {
-            const subSchemaType = effectSchemaMapping[subField.type];
-            if (subSchemaType && subSchemaType !== 'S.Unknown') {
-              usedSchemas.add(subSchemaType);
-            }
-          }
-        });
-      }
     });
     
     const schemaImports = Array.from(usedSchemas).join(',\n  ');
@@ -166,21 +146,8 @@ import {
 `;
   }
 
-  private generateSubtableTypes(fields: Array<[string, FieldDefinitionInterface]>): string {
-    const subtables = fields.filter(([_, field]) => field.type === 'SUBTABLE');
-    
-    return subtables.map(([code, field]) => {
-      if (!field.fields) return '';
-      
-      const subFields = Object.entries(field.fields).map(([subCode, subField]) => {
-        if (typeof subField === 'object' && subField !== null && 'type' in subField) {
-          const tsType = fieldTypeMapping[subField.type] || 'unknown';
-          return `  ${subCode}: ${tsType};`;
-        }
-        return `  ${subCode}: unknown;`;
-      }).join('\n');
-      
-      return `export interface ${code}Row {\n${subFields}\n}`;
-    }).join('\n\n');
+  private generateSubtableTypes(_fields: Array<[string, FieldDefinitionInterface]>): string {
+    // サブテーブルの型定義は不要（kintone-effect-schemaに委譲）
+    return '';
   }
 }

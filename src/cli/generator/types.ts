@@ -46,6 +46,11 @@ export const fieldTypeMapping: Record<string, string> = {
   CREATED_TIME: 'string',
   MODIFIER: '{ code: string; name: string }',
   UPDATED_TIME: 'string',
+  
+  // 追加されたフィールドタイプ
+  LOOKUP: 'string',
+  __ID__: 'string',
+  __REVISION__: 'string',
 };
 
 // Effect Schema用のマッピング
@@ -76,4 +81,8 @@ export const effectSchemaMapping: Record<string, string> = {
   MODIFIER: 'ModifierFieldSchema',
   UPDATED_TIME: 'UpdatedTimeFieldSchema',
   SUBTABLE: 'SubtableFieldSchema',
+  // 追加されたフィールドタイプ
+  LOOKUP: 'LookupFieldSchema',
+  __ID__: 'RecordIdFieldSchema',
+  __REVISION__: 'RevisionFieldSchema',
 };

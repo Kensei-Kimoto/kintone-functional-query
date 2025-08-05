@@ -14,6 +14,8 @@ Type-safe functional query builder for kintone
 - **CLI Tool**: Auto-generate Effect Schema from kintone API
 - **Full Type Support**: Leverage TypeScript's type system to its fullest
 - **All Operators**: Support for all kintone query operators
+- **Runtime Validation**: Schema-based validation with Effect-TS for enhanced safety
+- **Structured Logging**: Advanced logging system for debugging and monitoring
 
 ## Overview
 
@@ -22,9 +24,11 @@ kintone-functional-query is a TypeScript library that allows you to write type-s
 ## Features
 
 - 🔒 **Type-safe**: Type-safe query construction using TypeScript's type system
-- ✨ **Intuitive**: Natural syntax with lambda expressions
+- ✨ **Intuitive**: Natural syntax with lambda expressions  
 - 🚀 **Auto-completion**: Comfortable development experience with IDE auto-completion
 - 🔧 **Flexible**: Support for operators, functions, order by, limit, and offset
+- 🛡️ **Runtime Validation**: Effect-TS powered schema validation for enhanced safety
+- 📊 **Advanced Logging**: Structured logging with contextual information for debugging
 
 ## Installation
 
@@ -614,6 +618,61 @@ class SafeFieldManager {
 | Internal tool for multiple departments | B. Universal development | Different app configurations per department |
 
 For detailed implementation examples, see [Dynamic Query Builder Guide](FRONTEND_GUIDE.md).
+
+## Advanced Features
+
+### Runtime Validation with Effect-TS
+
+The library provides runtime validation for query expressions:
+
+```typescript
+import { kintoneQuery, Logger } from 'kintone-functional-query';
+
+// Enable debug logging
+process.env.DEBUG = 'true';
+
+const query = kintoneQuery<App>(r => 
+  r.Status.equals('Active') &&
+  r.Priority.greaterThan('invalid-number') // This will log validation warning
+).build();
+
+// Validation warnings are logged with structured context:
+// [kintone-query:WARN] Expression validation failed: Expected number, actual "invalid-number" 
+// (module=proxy function=createValidatedExpression field=Priority operator=>)
+```
+
+### Advanced Logging
+
+```typescript
+import { Logger } from 'kintone-functional-query';
+
+// Custom logging with context
+Logger.warn('Custom validation failed', {
+  module: 'my-module',
+  function: 'validateInput',
+  field: 'customerName',
+  value: userInput
+});
+
+// Structured logs automatically include module, function, and field information
+```
+
+### Function Argument Validation
+
+Date functions now have strict argument validation:
+
+```typescript
+import { FROM_TODAY } from 'kintone-functional-query';
+
+// Valid usage
+FROM_TODAY(7, 'DAYS');    // ✅ Valid
+FROM_TODAY(-30);          // ✅ Valid
+
+// Invalid usage (throws validation errors)
+FROM_TODAY(500);          // ❌ Out of range (-365 to 365)
+FROM_TODAY(5, 'HOURS');   // ❌ Invalid unit (must be DAYS/WEEKS/MONTHS/YEARS)
+FROM_TODAY('not-number'); // ❌ Invalid type (must be number)
+```
 
 ## Development
 

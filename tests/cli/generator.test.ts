@@ -117,8 +117,9 @@ describe('Schema Generator', () => {
     
     expect(result.schemaFile).toContain('SubtableFieldSchema');
     expect(result.schemaFile).toContain('注文明細: SubtableFieldSchema');
-    expect(result.schemaFile).toContain('商品コード: SingleLineTextFieldSchema');
-    expect(result.schemaFile).toContain('数量: NumberFieldSchema');
+    // サブテーブル内のフィールドは個別定義されない（kintone-effect-schemaに委譲）
+    expect(result.schemaFile).not.toContain('商品コード: SingleLineTextFieldSchema');
+    expect(result.schemaFile).not.toContain('数量: NumberFieldSchema');
   });
 
   it('should include system fields', async () => {
