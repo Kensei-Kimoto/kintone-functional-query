@@ -1,4 +1,4 @@
-import { Expression, QueryOptions, FunctionCall } from './types';
+import { Expression, QueryOptions, FunctionCall, OrderByClause } from './types';
 import { QueryParser } from './parser';
 import * as functions from './functions';
 import { escapeValue } from './escape';
@@ -49,6 +49,7 @@ export class QueryBuilder<Schema> {
 
   /**
    * Sets the ordering for query results.
+   * Can be chained multiple times for multi-field sorting.
    * 
    * @param {keyof Schema} field - The field to order by
    * @param {'asc' | 'desc'} [direction='asc'] - Sort direction
@@ -56,14 +57,55 @@ export class QueryBuilder<Schema> {
    * 
    * @example
    * ```typescript
+   * // Single field sort
    * builder.orderBy('CreatedDate', 'desc')
+   * 
+   * // Multiple field sort (chaining)
+   * builder
+   *   .orderBy('Priority', 'desc')
+   *   .orderBy('CreatedDate', 'asc')
    * ```
    */
   orderBy(field: keyof Schema, direction: 'asc' | 'desc' = 'asc'): this {
-    this.options.orderBy = {
+    const newClause: OrderByClause = {
       field: String(field),
       direction,
     };
+    
+    if (!this.options.orderBy) {
+      this.options.orderBy = newClause;
+    } else if (Array.isArray(this.options.orderBy)) {
+      this.options.orderBy.push(newClause);
+    } else {
+      // Convert single clause to array and add new clause
+      this.options.orderBy = [this.options.orderBy, newClause];
+    }
+    
+    return this;
+  }
+
+  /**
+   * Sets multiple ordering clauses at once.
+   * 
+   * @param {OrderByClause[]} clauses - Array of order by clauses
+   * @returns {this} The QueryBuilder instance for method chaining
+   * 
+   * @example
+   * ```typescript
+   * builder.orderByMany([
+   *   { field: 'Priority', direction: 'desc' },
+   *   { field: 'CreatedDate', direction: 'asc' },
+   *   { field: 'RecordNumber', direction: 'desc' }
+   * ])
+   * ```
+   */
+  orderByMany(clauses: Array<{ field: keyof Schema; direction: 'asc' | 'desc' }>): this {
+    const orderByClauses: OrderByClause[] = clauses.map(clause => ({
+      field: String(clause.field),
+      direction: clause.direction,
+    }));
+    
+    this.options.orderBy = orderByClauses;
     return this;
   }
 
@@ -77,8 +119,19 @@ export class QueryBuilder<Schema> {
    * ```typescript
    * builder.limit(100)
    * ```
+   * 
+   * @throws {Error} When count is outside the valid range (1-500)
    */
   limit(count: number): this {
+    // Validate kintone API limits
+    if (count < 1 || count > 500) {
+      throw new Error(`limit() must be between 1 and 500, got ${count}. kintone API allows maximum 500 records per request.`);
+    }
+    
+    if (!Number.isInteger(count)) {
+      throw new Error(`limit() must be an integer, got ${count}.`);
+    }
+    
     this.options.limit = count;
     return this;
   }
@@ -86,15 +139,26 @@ export class QueryBuilder<Schema> {
   /**
    * Sets the number of records to skip.
    * 
-   * @param {number} count - Number of records to skip
+   * @param {number} count - Number of records to skip (0-10000)
    * @returns {this} The QueryBuilder instance for method chaining
    * 
    * @example
    * ```typescript
    * builder.offset(50).limit(100) // Skip first 50, return next 100
    * ```
+   * 
+   * @throws {Error} When count is outside the valid range (0-10000)
    */
   offset(count: number): this {
+    // Validate kintone API limits
+    if (count < 0 || count > 10000) {
+      throw new Error(`offset() must be between 0 and 10000, got ${count}. kintone API allows maximum offset of 10000 records.`);
+    }
+    
+    if (!Number.isInteger(count)) {
+      throw new Error(`offset() must be an integer, got ${count}.`);
+    }
+    
     this.options.offset = count;
     return this;
   }
@@ -127,7 +191,14 @@ export class QueryBuilder<Schema> {
 
     // ORDER BY
     if (this.options.orderBy) {
-      queryParts.push(`order by ${this.options.orderBy.field} ${this.options.orderBy.direction}`);
+      if (Array.isArray(this.options.orderBy)) {
+        const orderByClauses = this.options.orderBy
+          .map(clause => `${clause.field} ${clause.direction}`)
+          .join(', ');
+        queryParts.push(`order by ${orderByClauses}`);
+      } else {
+        queryParts.push(`order by ${this.options.orderBy.field} ${this.options.orderBy.direction}`);
+      }
     }
 
     // LIMIT

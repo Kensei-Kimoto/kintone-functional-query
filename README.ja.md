@@ -6,14 +6,7 @@
 
 Type-safe functional query builder for kintone
 
-## 機能
-
-- **クエリビルダー**: ラムダ式で型安全なkintoneクエリを構築
-- **CLIツール**: kintone APIからEffect Schemaを自動生成
-- **完全な型サポート**: TypeScriptの型システムを最大限活用
-- **全演算子対応**: kintoneのすべてのクエリ演算子をサポート
-- **実行時バリデーション**: Effect-TSによるスキーマベース検証で安全性を向上
-- **構造化ログ**: デバッグと監視のための高度なログシステム
+[English README is here](README.md)
 
 ## 概要
 
@@ -24,9 +17,12 @@ kintone-functional-queryは、kintoneのクエリをラムダ式で型安全に�
 - 🔒 **型安全**: TypeScriptの型システムを活用した型安全なクエリ構築
 - ✨ **直感的**: ラムダ式による自然な記述
 - 🚀 **補完対応**: IDEの自動補完で快適な開発体験
-- 🔧 **柔軟**: 演算子、関数、order by、limit、offsetをサポート
+- 🔧 **柔軟**: 演算子、関数、複数ソート、ページネーションをサポート
 - 🛡️ **実行時検証**: Effect-TS駆動のスキーマ検証で安全性を向上
 - 📊 **高度なログ**: デバッグ用の構造化ログとコンテキスト情報
+- 🏭 **バッチ生成**: 設定ファイルによる複数アプリの一括スキーマ生成
+- ⚡ **API検証**: kintone API制限の組み込みバリデーション（500件、10k オフセット）
+- 🌐 **kintone-as-code 統合**: 既存のkintone-as-codeワークフローと互換
 
 ## インストール
 
@@ -38,12 +34,69 @@ npm install kintone-functional-query
 
 ### 1. CLIでスキーマを生成
 
+#### 単一アプリの生成
+
 ```bash
 npx kintone-query-gen generate \
   --domain example.cybozu.com \
   --app-id 123 \
   --api-token YOUR_API_TOKEN \
   --output ./src/generated
+```
+
+#### 設定ファイルによるバッチ生成
+
+```bash
+# 複数アプリのスキーマを一括生成
+npx kintone-query-gen batch --config ./kintone.config.js
+
+# 異なる環境を使用
+npx kintone-query-gen batch --env development
+
+# 何が生成されるかプレビュー
+npx kintone-query-gen batch --dry-run
+
+# 並列処理数を制御
+npx kintone-query-gen batch --parallel 5
+```
+
+#### 設定ファイル（kintone-functional-query.config.js）
+
+```javascript
+export default {
+  default: 'production',
+  environments: {
+    production: {
+      auth: {
+        baseUrl: 'https://your-domain.cybozu.com',
+        apiToken: process.env.KINTONE_API_TOKEN,
+      }
+    },
+    development: {
+      auth: {
+        baseUrl: 'https://dev-domain.cybozu.com',
+        apiToken: process.env.KINTONE_DEV_TOKEN,
+      }
+    }
+  },
+  apps: [
+    {
+      appId: '123',
+      name: '営業管理',
+      outputPath: './schemas/sales',
+      schemaName: 'SalesSchema'
+    },
+    {
+      appId: '456', 
+      name: '顧客データベース',
+      outputPath: './schemas/customer'
+    }
+  ],
+  output: {
+    baseDir: 'generated',
+    indexFile: true
+  }
+};
 ```
 
 #### 生成されるファイルの例
@@ -100,19 +153,34 @@ const query2 = kintoneQuery<App>(r =>
 ).build();
 // => '((顧客名 = "サイボウズ株式会社" and 契約日 < TODAY()) and ステータス not in ("完了", "キャンセル"))'
 
-// 全部盛りの例（orderBy、limit、offset）
+// 複数ソートとAPIバリデーション
 const query3 = kintoneQuery<App>(r =>
   r.金額.greaterThan(1000000) &&
   r.契約日.greaterThanOrEqual(FROM_TODAY(-30, 'DAYS')) &&
   r.ステータス.in(["商談中", "受注"])
 )
-  .orderBy('金額', 'desc')
-  .limit(100)
-  .offset(20)
+  .orderBy('優先度', 'desc')     // 主ソート
+  .orderBy('金額', 'desc')       // 副ソート
+  .orderBy('契約日', 'asc')     // 第3ソート
+  .limit(100)                       // ✅ バリデーション: 1-500のみ
+  .offset(50)                       // ✅ バリデーション: 0-10000のみ
   .build();
-// => '((金額 > 1000000 and 契約日 >= FROM_TODAY(-30, "DAYS")) and ステータス in ("商談中", "受注")) order by 金額 desc limit 100 offset 20'
+// => '((金額 > 1000000 and 契約日 >= FROM_TODAY(-30, "DAYS")) and ステータス in ("商談中", "受注")) order by 優先度 desc, 金額 desc, 契約日 asc limit 100 offset 50'
 
-// サブテーブルを含むクエリ
+// orderByManyで一括ソート
+const query3b = kintoneQuery<App>(r =>
+  r.ステータス.equals("アクティブ")
+)
+  .orderByMany([
+    { field: '優先度', direction: 'desc' },
+    { field: '期限日', direction: 'asc' },
+    { field: '金額', direction: 'desc' }
+  ])
+  .limit(500)  // kintone APIの最大値
+  .build();
+// => 'ステータス = "アクティブ" order by 優先度 desc, 期限日 asc, 金額 desc limit 500'
+
+// サブテーブルとAPIバリデーション
 const 注文明細 = subTable('注文明細');
 const query4 = kintoneQuery<App>(r =>
   r.顧客名.like("株式会社%") &&
@@ -120,9 +188,13 @@ const query4 = kintoneQuery<App>(r =>
   注文明細.数量.greaterThan(100)
 )
   .orderBy('契約日', 'desc')
-  .limit(50)
+  .limit(50)   // ✅ API制限内
   .build();
 // => '((顧客名 like "株式会社%" and 注文明細.商品コード in ("P001", "P002", "P003")) and 注文明細.数量 > 100) order by 契約日 desc limit 50'
+
+// ❌ これらはバリデーションエラーで弾かれます：
+// .limit(501)    // エラー: limit()は1から500の間である必要があります
+// .offset(10001) // エラー: offset()は0から10000の間である必要があります
 ```
 
 ### 3. カスタマイズでの使用
@@ -162,6 +234,153 @@ kintone.events.on('app.record.index.show', (event) => {
 ```
 
 webpack等でバンドルして使用してください。
+
+## バッチ生成機能
+
+設定ファイルを使用して、複数のkintoneアプリのスキーマを効率的に生成できます。
+
+### 設定ファイルの互換性
+
+このライブラリは`kintone-as-code`の設定形式と互換性があり、シームレスな統合が可能です：
+
+```javascript
+// kintone-functional-query.config.js（またはkintone-as-code.config.js）
+export default {
+  default: 'production',
+  environments: {
+    production: {
+      auth: {
+        baseUrl: 'https://your-company.cybozu.com',
+        apiToken: process.env.KINTONE_API_TOKEN,
+      }
+    },
+    development: {
+      auth: {
+        baseUrl: 'https://dev.cybozu.com', 
+        username: process.env.KINTONE_USERNAME,
+        password: process.env.KINTONE_PASSWORD,
+      }
+    }
+  },
+  apps: [
+    {
+      appId: process.env.SALES_APP_ID || '123',
+      name: '営業管理',
+      outputPath: './schemas/sales',
+      schemaName: 'SalesAppSchema'
+    },
+    {
+      appId: process.env.CUSTOMER_APP_ID || '456',
+      name: '顧客データベース', 
+      outputPath: './schemas/customer'
+    }
+  ],
+  output: {
+    baseDir: 'generated',
+    indexFile: true,
+    format: 'typescript'
+  }
+};
+```
+
+### バッチコマンド
+
+```bash
+# 設定されたすべてのアプリを生成
+kintone-query-gen batch
+
+# 特定の設定ファイルを使用
+kintone-query-gen batch --config ./custom-config.js
+
+# 異なる環境を使用
+kintone-query-gen batch --env development
+
+# 何が生成されるかプレビュー
+kintone-query-gen batch --dry-run
+
+# 並列処理数を制御（デフォルト: 3）
+kintone-query-gen batch --parallel 5
+
+# 特定環境でカスタム並列数
+kintone-query-gen batch --env production --parallel 8
+```
+
+### ワークフロー統合
+
+```bash
+# 典型的な開発ワークフロー
+kintone-as-code export --app-id 123 --name sales-app
+kintone-query-gen batch --config kintone-as-code.config.js
+
+# CI/CDパイプライン
+kintone-query-gen batch --env production --dry-run  # 検証
+kintone-query-gen batch --env production            # 実行
+```
+
+## 複数ソート & API制限バリデーション
+
+### 複数フィールドでのソート
+
+`.orderBy()`の連鎖または`.orderByMany()`で複雑なソートが可能：
+
+```typescript
+// メソッドチェーンアプローチ
+const query1 = kintoneQuery<App>(r => r.ステータス.equals('アクティブ'))
+  .orderBy('優先度', 'desc')      // 主ソート
+  .orderBy('期限日', 'asc')        // 副ソート  
+  .orderBy('金額', 'desc')        // 第3ソート
+  .build();
+
+// 一括アプローチ
+const query2 = kintoneQuery<App>(r => r.ステータス.equals('アクティブ'))
+  .orderByMany([
+    { field: '優先度', direction: 'desc' },
+    { field: '期限日', direction: 'asc' },
+    { field: '金額', direction: 'desc' }
+  ])
+  .build();
+
+// どちらも生成される: 'ステータス = "アクティブ" order by 優先度 desc, 期限日 asc, 金額 desc'
+```
+
+### API制限バリデーション
+
+kintone API制限違反を防ぐ組み込みバリデーション：
+
+```typescript
+// ✅ 有効 - kintone API制限内
+const validQuery = kintoneQuery<App>(r => r.ステータス.equals('アクティブ'))
+  .limit(500)    // kintoneで許可される最大値
+  .offset(10000) // kintoneで許可される最大値
+  .build();
+
+// ❌ これらは即座にバリデーションエラーをスロー：
+try {
+  kintoneQuery<App>(r => r.ステータス.equals('アクティブ'))
+    .limit(501)    // エラー: limit()は1から500の間である必要があります、受け取った値: 501
+    .build();
+} catch (error) {
+  console.error(error.message);
+}
+
+try {
+  kintoneQuery<App>(r => r.ステータス.equals('アクティブ'))
+    .offset(10001) // エラー: offset()は0から10000の間である必要があります、受け取った値: 10001
+    .build();
+} catch (error) {
+  console.error(error.message);
+}
+
+// ❌ 非整数値もエラーをトリガー
+builder.limit(50.5);  // エラー: limit()は整数である必要があります、受け取った値: 50.5
+```
+
+### APIバリデーションの利点
+
+- **早期発見**: 制限違反をビルド時に検出、実行時ではない
+- **明確なエラーメッセージ**: 何が間違って、なぜなのかを正確に理解
+- **開発効率性**: kintone APIの制約を覚える必要がない
+- **本番安全性**: 本番環境での失敗したAPIコールを防止
 
 ## サポートするメソッド
 
@@ -384,6 +603,155 @@ const modifiedAst = modifyFieldValue(ast, 'Status', 'Closed');
 - 論理演算子（`and`, `or`）
 - 関数（例：`TODAY()`, `LOGINUSER()`, `FROM_TODAY()`）
 - サブテーブルフィールド（例：`Table.Field`）
+
+## 完全クエリAST & 高度な操作 (Phase 3)
+
+**v0.3.0新機能**: ORDER BY、LIMIT、OFFSET句を含む完全なkintoneクエリのAST操作に対応しました。
+
+### 完全クエリのパース
+
+WHERE句だけでなく、完全なkintoneクエリを構造化されたASTにパースできます：
+
+```typescript
+import { parseKintoneQueryComplete } from 'kintone-functional-query';
+
+// ORDER BY、LIMIT、OFFSETを含む完全なクエリをパース
+const complexQuery = 'Status = "Open" and Priority >= 3 order by Priority desc, DueDate asc limit 50 offset 10';
+const ast = parseKintoneQueryComplete(complexQuery);
+
+console.log(ast);
+// {
+//   where: {
+//     type: "and",
+//     left: { field: "Status", operator: "=", value: "Open" },
+//     right: { field: "Priority", operator: ">=", value: 3 }
+//   },
+//   orderBy: [
+//     { field: "Priority", direction: "desc" },
+//     { field: "DueDate", direction: "asc" }
+//   ],
+//   limit: 50,
+//   offset: 10
+// }
+```
+
+### 双方向クエリ変換
+
+クエリ文字列とASTをシームレスに相互変換できます：
+
+```typescript
+import { queryConverter, astToQuery } from 'kintone-functional-query';
+
+// クエリ文字列からコンバーターを作成
+const converter = queryConverter('Status = "Open" limit 25');
+
+// ASTにアクセスして変更
+console.log(converter.ast.limit); // 25
+
+// プログラム的にクエリを変更
+const modified = converter
+  .setLimit(100)
+  .setOrderBy([{ field: 'Priority', direction: 'desc' }])
+  .setOffset(20);
+
+console.log(modified.toQuery()); 
+// "Status = "Open" order by Priority desc limit 100 offset 20"
+```
+
+### 高度なクエリ変換
+
+コールバック関数を使用してクエリを変換できます：
+
+```typescript
+import { transformQuery, combineQueries } from 'kintone-functional-query';
+
+// 任意のクエリにページネーションを追加
+const addPagination = (query: string, page: number, pageSize: number) =>
+  transformQuery(query, ast => {
+    ast.limit = pageSize;
+    ast.offset = (page - 1) * pageSize;
+  });
+
+const paginatedQuery = addPagination('Status = "Open"', 2, 25);
+// "Status = "Open" limit 25 offset 25"
+
+// 複数のフィルターをANDロジックで結合
+const combinedFilters = combineQueries([
+  'Status = "Open"',
+  'Priority >= 3',
+  'AssignedTo = LOGINUSER()'
+]);
+// "((Status = "Open" and Priority >= 3) and AssignedTo = LOGINUSER())"
+```
+
+### クエリコンポーネントの抽出
+
+クエリの特定の部分を抽出・分析できます：
+
+```typescript
+import { extractQueryComponents } from 'kintone-functional-query';
+
+const components = extractQueryComponents(
+  'Status = "Open" and Priority > 3 order by Priority desc limit 50 offset 10'
+);
+
+console.log({
+  whereQuery: components.whereQuery,     // "(Status = "Open" and Priority > 3)"
+  orderBy: components.orderBy,           // [{ field: "Priority", direction: "desc" }]
+  limit: components.limit,               // 50
+  offset: components.offset,             // 10
+  hasWhere: components.hasWhere,         // true
+  hasOrderBy: components.hasOrderBy,     // true
+  sortFieldCount: components.sortFieldCount // 1
+});
+```
+
+### GUIクエリビルダーの基盤
+
+完全AST対応により、視覚的なクエリビルダーの構築が可能になります：
+
+```typescript
+// GUIアプリケーションで必要な機能：
+// 1. 既存クエリを編集可能なコンポーネントにパース
+// 2. クエリ構造とAPI制限の検証
+// 3. 視覚的コンポーネントからクエリ生成
+// 4. 元に戻す/やり直し操作のサポート
+// 5. テンプレートとスニペット管理
+
+const queryEditor = {
+  load: (queryString: string) => queryConverter(queryString),
+  
+  save: (converter: any) => converter.toQuery(),
+  
+  addFilter: (converter: any, field: string, op: string, value: any) =>
+    converter.modify(ast => {
+      const newCondition = { field, operator: op, value };
+      ast.where = ast.where ? {
+        type: 'and',
+        left: ast.where,
+        right: newCondition
+      } : newCondition;
+    }),
+    
+  setSort: (converter: any, sorts: Array<{field: string, direction: 'asc'|'desc'}>) =>
+    converter.setOrderBy(sorts)
+};
+```
+
+### API検証と安全性
+
+すべてのAST操作には組み込みのkintone API検証が含まれます：
+
+```typescript
+// ✅ 有効な操作
+queryConverter('Status = "Open"').setLimit(500);    // 許可される最大値
+queryConverter('Status = "Open"').setOffset(10000); // 許可される最大値
+
+// ❌ これらは検証エラーを投げます
+queryConverter('Status = "Open"').setLimit(501);    // API制限を超過
+queryConverter('Status = "Open"').setOffset(10001); // API制限を超過
+queryConverter('Status = "Open"').setLimit(50.5);   // 非整数値
+```
 
 ## フロントエンドでの使用
 

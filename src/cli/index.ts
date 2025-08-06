@@ -7,6 +7,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { KintoneApiClient } from './api/client';
 import { SchemaGenerator } from './generator';
+import { batchCommand } from './commands/batch';
 
 // CLIオプション
 const domain = Options.text('domain').pipe(
@@ -115,10 +116,18 @@ export * from './${args.schemaName.toLowerCase()}.types';
   }
 );
 
+// メインCLIコマンド（サブコマンドを統合）
+const mainCommand = Command.make('kintone-query-gen').pipe(
+  Command.withSubcommands([
+    generate.pipe(Command.withDescription('Generate schema from a single kintone app')),
+    batchCommand.pipe(Command.withDescription('Generate schemas for multiple apps using config file'))
+  ])
+);
+
 // CLIアプリケーション
-const cli = Command.run(generate, {
+const cli = Command.run(mainCommand, {
   name: 'kintone-query-gen',
-  version: '0.1.0',
+  version: '0.3.0',
 });
 
 // 実行

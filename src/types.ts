@@ -132,16 +132,80 @@ export type FunctionCall = S.Schema.Type<typeof FunctionCallSchema>;
 export type QueryExpression = S.Schema.Type<typeof QueryExpressionSchema>;
 
 // ============================================
+// Complete AST Schemas (Phase 3)
+// ============================================
+
+export const OrderByClauseSchema = S.Struct({
+  field: S.String,
+  direction: S.Literal('asc', 'desc')
+});
+
+export const CompleteQueryASTSchema = S.Struct({
+  where: S.optional(ExpressionSchema),
+  orderBy: S.optional(S.Array(OrderByClauseSchema)),
+  limit: S.optional(
+    S.Number.pipe(
+      S.int(),
+      S.greaterThanOrEqualTo(1),
+      S.lessThanOrEqualTo(500),
+      S.annotations({
+        description: "kintone API limit constraint: must be between 1 and 500"
+      })
+    )
+  ),
+  offset: S.optional(
+    S.Number.pipe(
+      S.int(),
+      S.greaterThanOrEqualTo(0),
+      S.lessThanOrEqualTo(10000),
+      S.annotations({
+        description: "kintone API offset constraint: must be between 0 and 10000"
+      })
+    )
+  )
+});
+
+export const ParseResultSchema = S.Struct({
+  ast: CompleteQueryASTSchema,
+  originalQuery: S.String
+});
+
+// ============================================
 // Utility types (not schema-derived)
 // ============================================
 
+export interface OrderByClause {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
 export interface QueryOptions {
-  orderBy?: {
-    field: string;
-    direction: 'asc' | 'desc';
-  };
+  orderBy?: OrderByClause | OrderByClause[];
   limit?: number;
   offset?: number;
+}
+
+// ============================================
+// Complete AST Types (Phase 3)
+// ============================================
+
+/**
+ * Complete Query AST - represents the full structure of a kintone query
+ * including WHERE clause, ORDER BY, LIMIT, and OFFSET
+ */
+export interface CompleteQueryAST {
+  where?: Expression;
+  orderBy?: OrderByClause[];
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Parse result containing both the AST and original query string
+ */
+export interface ParseResult {
+  ast: CompleteQueryAST;
+  originalQuery: string;
 }
 
 export interface FieldMethods<T> {

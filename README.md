@@ -8,15 +8,6 @@ Type-safe functional query builder for kintone
 
 [日本語版 README はこちら](README.ja.md)
 
-## Features
-
-- **Query Builder**: Build type-safe kintone queries with lambda expressions
-- **CLI Tool**: Auto-generate Effect Schema from kintone API
-- **Full Type Support**: Leverage TypeScript's type system to its fullest
-- **All Operators**: Support for all kintone query operators
-- **Runtime Validation**: Schema-based validation with Effect-TS for enhanced safety
-- **Structured Logging**: Advanced logging system for debugging and monitoring
-
 ## Overview
 
 kintone-functional-query is a TypeScript library that allows you to write type-safe kintone queries using lambda expressions. Take advantage of IDE auto-completion to build queries intuitively.
@@ -26,9 +17,12 @@ kintone-functional-query is a TypeScript library that allows you to write type-s
 - 🔒 **Type-safe**: Type-safe query construction using TypeScript's type system
 - ✨ **Intuitive**: Natural syntax with lambda expressions  
 - 🚀 **Auto-completion**: Comfortable development experience with IDE auto-completion
-- 🔧 **Flexible**: Support for operators, functions, order by, limit, and offset
+- 🔧 **Flexible**: Support for operators, functions, multiple sorting, and pagination
 - 🛡️ **Runtime Validation**: Effect-TS powered schema validation for enhanced safety
 - 📊 **Advanced Logging**: Structured logging with contextual information for debugging
+- 🏭 **Batch Generation**: Generate schemas for multiple apps with configuration files
+- ⚡ **API Validation**: Built-in kintone API limits validation (500 records, 10k offset)
+- 🌐 **kintone-as-code Integration**: Compatible with existing kintone-as-code workflows
 
 ## Installation
 
@@ -40,12 +34,69 @@ npm install kintone-functional-query
 
 ### 1. Generate Schema with CLI
 
+#### Single App Generation
+
 ```bash
 npx kintone-query-gen generate \
   --domain example.cybozu.com \
   --app-id 123 \
   --api-token YOUR_API_TOKEN \
   --output ./src/generated
+```
+
+#### Batch Generation with Configuration File
+
+```bash
+# Generate schemas for multiple apps
+npx kintone-query-gen batch --config ./kintone.config.js
+
+# Use different environment
+npx kintone-query-gen batch --env development
+
+# Dry run to see what would be generated
+npx kintone-query-gen batch --dry-run
+
+# Control parallel processing
+npx kintone-query-gen batch --parallel 5
+```
+
+#### Configuration File (kintone-functional-query.config.js)
+
+```javascript
+export default {
+  default: 'production',
+  environments: {
+    production: {
+      auth: {
+        baseUrl: 'https://your-domain.cybozu.com',
+        apiToken: process.env.KINTONE_API_TOKEN,
+      }
+    },
+    development: {
+      auth: {
+        baseUrl: 'https://dev-domain.cybozu.com',
+        apiToken: process.env.KINTONE_DEV_TOKEN,
+      }
+    }
+  },
+  apps: [
+    {
+      appId: '123',
+      name: 'Sales Management',
+      outputPath: './schemas/sales',
+      schemaName: 'SalesSchema'
+    },
+    {
+      appId: '456', 
+      name: 'Customer Database',
+      outputPath: './schemas/customer'
+    }
+  ],
+  output: {
+    baseDir: 'generated',
+    indexFile: true
+  }
+};
 ```
 
 #### Generated File Example
@@ -102,19 +153,34 @@ const query2 = kintoneQuery<App>(r =>
 ).build();
 // => '((CustomerName = "Cybozu Inc." and ContractDate < TODAY()) and Status not in ("Completed", "Cancelled"))'
 
-// Full example with orderBy, limit, offset
+// Multiple sorting and API validation
 const query3 = kintoneQuery<App>(r =>
   r.Amount.greaterThan(1000000) &&
   r.ContractDate.greaterThanOrEqual(FROM_TODAY(-30, 'DAYS')) &&
   r.Status.in(["Negotiating", "Ordered"])
 )
-  .orderBy('Amount', 'desc')
-  .limit(100)
-  .offset(20)
+  .orderBy('Priority', 'desc')     // Primary sort
+  .orderBy('Amount', 'desc')       // Secondary sort
+  .orderBy('ContractDate', 'asc')  // Tertiary sort
+  .limit(100)                      // ✅ Validated: 1-500 only
+  .offset(50)                      // ✅ Validated: 0-10000 only
   .build();
-// => '((Amount > 1000000 and ContractDate >= FROM_TODAY(-30, "DAYS")) and Status in ("Negotiating", "Ordered")) order by Amount desc limit 100 offset 20'
+// => '((Amount > 1000000 and ContractDate >= FROM_TODAY(-30, "DAYS")) and Status in ("Negotiating", "Ordered")) order by Priority desc, Amount desc, ContractDate asc limit 100 offset 50'
 
-// Query with subtable
+// Bulk sorting with orderByMany
+const query3b = kintoneQuery<App>(r =>
+  r.Status.equals("Active")
+)
+  .orderByMany([
+    { field: 'Priority', direction: 'desc' },
+    { field: 'DueDate', direction: 'asc' },
+    { field: 'Amount', direction: 'desc' }
+  ])
+  .limit(500)  // Maximum allowed by kintone API
+  .build();
+// => 'Status = "Active" order by Priority desc, DueDate asc, Amount desc limit 500'
+
+// Query with subtable and API validation
 const OrderDetails = subTable('OrderDetails');
 const query4 = kintoneQuery<App>(r =>
   r.CustomerName.like("Corp%") &&
@@ -122,9 +188,13 @@ const query4 = kintoneQuery<App>(r =>
   OrderDetails.Quantity.greaterThan(100)
 )
   .orderBy('ContractDate', 'desc')
-  .limit(50)
+  .limit(50)   // ✅ Within API limits
   .build();
 // => '((CustomerName like "Corp%" and OrderDetails.ProductCode in ("P001", "P002", "P003")) and OrderDetails.Quantity > 100) order by ContractDate desc limit 50'
+
+// ❌ These would throw validation errors:
+// .limit(501)    // Error: limit() must be between 1 and 500
+// .offset(10001) // Error: offset() must be between 0 and 10000
 ```
 
 ### 3. Use in Customization
@@ -164,6 +234,153 @@ kintone.events.on('app.record.index.show', (event) => {
 ```
 
 Bundle with webpack or similar tools for use.
+
+## Batch Generation
+
+Generate schemas for multiple kintone apps efficiently using configuration files.
+
+### Configuration File Compatibility
+
+This library is compatible with `kintone-as-code` configuration format, allowing seamless integration:
+
+```javascript
+// kintone-functional-query.config.js (or kintone-as-code.config.js)
+export default {
+  default: 'production',
+  environments: {
+    production: {
+      auth: {
+        baseUrl: 'https://your-company.cybozu.com',
+        apiToken: process.env.KINTONE_API_TOKEN,
+      }
+    },
+    development: {
+      auth: {
+        baseUrl: 'https://dev.cybozu.com', 
+        username: process.env.KINTONE_USERNAME,
+        password: process.env.KINTONE_PASSWORD,
+      }
+    }
+  },
+  apps: [
+    {
+      appId: process.env.SALES_APP_ID || '123',
+      name: 'Sales Management',
+      outputPath: './schemas/sales',
+      schemaName: 'SalesAppSchema'
+    },
+    {
+      appId: process.env.CUSTOMER_APP_ID || '456',
+      name: 'Customer Database', 
+      outputPath: './schemas/customer'
+    }
+  ],
+  output: {
+    baseDir: 'generated',
+    indexFile: true,
+    format: 'typescript'
+  }
+};
+```
+
+### Batch Commands
+
+```bash
+# Generate all configured apps
+kintone-query-gen batch
+
+# Use specific config file
+kintone-query-gen batch --config ./custom-config.js
+
+# Use different environment
+kintone-query-gen batch --env development
+
+# Preview what will be generated
+kintone-query-gen batch --dry-run
+
+# Control parallelism (default: 3)
+kintone-query-gen batch --parallel 5
+
+# Generate specific environment with custom parallelism
+kintone-query-gen batch --env production --parallel 8
+```
+
+### Workflow Integration
+
+```bash
+# Typical development workflow
+kintone-as-code export --app-id 123 --name sales-app
+kintone-query-gen batch --config kintone-as-code.config.js
+
+# CI/CD pipeline
+kintone-query-gen batch --env production --dry-run  # Verify
+kintone-query-gen batch --env production            # Execute
+```
+
+## Multiple Sorting & API Validation
+
+### Multiple Sort Fields
+
+Chain `.orderBy()` calls or use `.orderByMany()` for complex sorting:
+
+```typescript
+// Method chaining approach
+const query1 = kintoneQuery<App>(r => r.Status.equals('Active'))
+  .orderBy('Priority', 'desc')      // Primary sort
+  .orderBy('DueDate', 'asc')        // Secondary sort  
+  .orderBy('Amount', 'desc')        // Tertiary sort
+  .build();
+
+// Bulk approach
+const query2 = kintoneQuery<App>(r => r.Status.equals('Active'))
+  .orderByMany([
+    { field: 'Priority', direction: 'desc' },
+    { field: 'DueDate', direction: 'asc' },
+    { field: 'Amount', direction: 'desc' }
+  ])
+  .build();
+
+// Both generate: 'Status = "Active" order by Priority desc, DueDate asc, Amount desc'
+```
+
+### API Limits Validation
+
+Built-in validation prevents kintone API limit violations:
+
+```typescript
+// ✅ Valid - within kintone API limits
+const validQuery = kintoneQuery<App>(r => r.Status.equals('Active'))
+  .limit(500)    // Maximum allowed by kintone
+  .offset(10000) // Maximum allowed by kintone
+  .build();
+
+// ❌ These throw validation errors immediately:
+try {
+  kintoneQuery<App>(r => r.Status.equals('Active'))
+    .limit(501)    // Error: limit() must be between 1 and 500, got 501
+    .build();
+} catch (error) {
+  console.error(error.message);
+}
+
+try {
+  kintoneQuery<App>(r => r.Status.equals('Active'))
+    .offset(10001) // Error: offset() must be between 0 and 10000, got 10001
+    .build();
+} catch (error) {
+  console.error(error.message);
+}
+
+// ❌ Non-integer values also trigger errors
+builder.limit(50.5);  // Error: limit() must be an integer, got 50.5
+```
+
+### Benefits of API Validation
+
+- **Fail Fast**: Catch limit violations at build time, not runtime
+- **Clear Error Messages**: Understand exactly what went wrong and why
+- **Development Efficiency**: No need to remember kintone API constraints
+- **Production Safety**: Prevent failed API calls in production environments
 
 ## Supported Methods
 
@@ -386,6 +603,155 @@ The parser supports all kintone query syntax including:
 - Logical operators (`and`, `or`)
 - Functions (e.g., `TODAY()`, `LOGINUSER()`, `FROM_TODAY()`)
 - Subtable fields (e.g., `Table.Field`)
+
+## Complete Query AST & Advanced Manipulation (Phase 3)
+
+**New in v0.3.0**: Advanced AST-based query manipulation with full kintone query support including ORDER BY, LIMIT, and OFFSET clauses.
+
+### Complete Query Parsing
+
+Parse complete kintone queries (not just WHERE clauses) into structured AST:
+
+```typescript
+import { parseKintoneQueryComplete } from 'kintone-functional-query';
+
+// Parse complete query with ORDER BY, LIMIT, OFFSET
+const complexQuery = 'Status = "Open" and Priority >= 3 order by Priority desc, DueDate asc limit 50 offset 10';
+const ast = parseKintoneQueryComplete(complexQuery);
+
+console.log(ast);
+// {
+//   where: {
+//     type: "and",
+//     left: { field: "Status", operator: "=", value: "Open" },
+//     right: { field: "Priority", operator: ">=", value: 3 }
+//   },
+//   orderBy: [
+//     { field: "Priority", direction: "desc" },
+//     { field: "DueDate", direction: "asc" }
+//   ],
+//   limit: 50,
+//   offset: 10
+// }
+```
+
+### Bidirectional Query Conversion
+
+Convert between query strings and AST seamlessly:
+
+```typescript
+import { queryConverter, astToQuery } from 'kintone-functional-query';
+
+// Create converter from query string
+const converter = queryConverter('Status = "Open" limit 25');
+
+// Access and modify AST
+console.log(converter.ast.limit); // 25
+
+// Modify query programmatically
+const modified = converter
+  .setLimit(100)
+  .setOrderBy([{ field: 'Priority', direction: 'desc' }])
+  .setOffset(20);
+
+console.log(modified.toQuery()); 
+// "Status = "Open" order by Priority desc limit 100 offset 20"
+```
+
+### Advanced Query Transformation
+
+Transform queries using callback functions:
+
+```typescript
+import { transformQuery, combineQueries } from 'kintone-functional-query';
+
+// Add pagination to any query
+const addPagination = (query: string, page: number, pageSize: number) =>
+  transformQuery(query, ast => {
+    ast.limit = pageSize;
+    ast.offset = (page - 1) * pageSize;
+  });
+
+const paginatedQuery = addPagination('Status = "Open"', 2, 25);
+// "Status = "Open" limit 25 offset 25"
+
+// Combine multiple filters with AND logic
+const combinedFilters = combineQueries([
+  'Status = "Open"',
+  'Priority >= 3',
+  'AssignedTo = LOGINUSER()'
+]);
+// "((Status = "Open" and Priority >= 3) and AssignedTo = LOGINUSER())"
+```
+
+### Query Component Extraction
+
+Extract and analyze specific parts of queries:
+
+```typescript
+import { extractQueryComponents } from 'kintone-functional-query';
+
+const components = extractQueryComponents(
+  'Status = "Open" and Priority > 3 order by Priority desc limit 50 offset 10'
+);
+
+console.log({
+  whereQuery: components.whereQuery,     // "(Status = "Open" and Priority > 3)"
+  orderBy: components.orderBy,           // [{ field: "Priority", direction: "desc" }]
+  limit: components.limit,               // 50
+  offset: components.offset,             // 10
+  hasWhere: components.hasWhere,         // true
+  hasOrderBy: components.hasOrderBy,     // true
+  sortFieldCount: components.sortFieldCount // 1
+});
+```
+
+### GUI Query Builder Foundation
+
+The complete AST support provides the foundation for building visual query builders:
+
+```typescript
+// Perfect for GUI applications that need to:
+// 1. Parse existing queries into editable components
+// 2. Validate query structure and API limits
+// 3. Generate queries from visual components
+// 4. Support undo/redo operations
+// 5. Template and snippet management
+
+const queryEditor = {
+  load: (queryString: string) => queryConverter(queryString),
+  
+  save: (converter: any) => converter.toQuery(),
+  
+  addFilter: (converter: any, field: string, op: string, value: any) =>
+    converter.modify(ast => {
+      const newCondition = { field, operator: op, value };
+      ast.where = ast.where ? {
+        type: 'and',
+        left: ast.where,
+        right: newCondition
+      } : newCondition;
+    }),
+    
+  setSort: (converter: any, sorts: Array<{field: string, direction: 'asc'|'desc'}>) =>
+    converter.setOrderBy(sorts)
+};
+```
+
+### API Validation & Safety
+
+All AST operations include built-in kintone API validation:
+
+```typescript
+// ✅ Valid operations
+queryConverter('Status = "Open"').setLimit(500);    // Max allowed
+queryConverter('Status = "Open"').setOffset(10000); // Max allowed
+
+// ❌ These throw validation errors
+queryConverter('Status = "Open"').setLimit(501);    // Over API limit
+queryConverter('Status = "Open"').setOffset(10001); // Over API limit
+queryConverter('Status = "Open"').setLimit(50.5);   // Non-integer
+```
 
 ## Frontend Usage
 

@@ -1,4 +1,4 @@
-import { Expression, QueryExpression, LogicalExpression, FunctionCall, KintoneOperator, KintoneFunction, QueryExpressionSchema } from './types';
+import { Expression, QueryExpression, LogicalExpression, FunctionCall, KintoneOperator, KintoneFunction, QueryExpressionSchema, CompleteQueryAST, OrderByClause } from './types';
 import { Schema as S } from 'effect';
 import { logValidationWarning } from './utils/logger';
 
@@ -27,7 +27,7 @@ export class KintoneQueryParser {
   }
   
   /**
-   * kintoneクエリ文字列をパースしてASTを生成
+   * kintoneクエリ文字列をパースしてASTを生成 (レガシー互換性維持)
    */
   parse(query: string): Expression | null {
     this.input = query.trim();
@@ -44,6 +44,47 @@ export class KintoneQueryParser {
     }
     
     return expr;
+  }
+
+  /**
+   * kintoneクエリ文字列を完全なASTにパース (Phase 3: Complete Query Support)
+   */
+  parseComplete(query: string): CompleteQueryAST | null {
+    this.input = query.trim();
+    this.pos = 0;
+    
+    if (!this.input) return null;
+    
+    const ast: CompleteQueryAST = {};
+    
+    // WHERE句のパース (オプション)
+    if (this.hasWhereClause()) {
+      ast.where = this.parseWhere();
+    }
+    
+    // ORDER BY句のパース (オプション)
+    if (this.consumeKeyword('order')) {
+      this.expectKeyword('by');
+      ast.orderBy = this.parseOrderBy();
+    }
+    
+    // LIMIT句のパース (オプション)
+    if (this.consumeKeyword('limit')) {
+      ast.limit = this.parseLimit();
+    }
+    
+    // OFFSET句のパース (オプション) 
+    if (this.consumeKeyword('offset')) {
+      ast.offset = this.parseOffset();
+    }
+    
+    // 全体をパースできたかチェック
+    this.skipWhitespace();
+    if (this.pos < this.input.length) {
+      throw new Error(`Unexpected characters at position ${this.pos}: "${this.input.slice(this.pos)}"`);
+    }
+    
+    return ast;
   }
   
   /**
@@ -80,6 +121,122 @@ export class KintoneQueryParser {
     }
     
     return left;
+  }
+
+  /**
+   * WHERE句があるかチェック
+   */
+  private hasWhereClause(): boolean {
+    const saved = this.pos;
+    this.skipWhitespace();
+    
+    // ORDER BY, LIMIT, OFFSET で始まらない場合はWHERE句とみなす
+    const nextTokens = ['order', 'limit', 'offset'];
+    
+    for (const token of nextTokens) {
+      if (this.input.toLowerCase().slice(this.pos, this.pos + token.length) === token) {
+        this.pos = saved;
+        return false;
+      }
+    }
+    
+    this.pos = saved;
+    return this.pos < this.input.length;
+  }
+
+  /**
+   * WHERE句のパース
+   */
+  private parseWhere(): Expression {
+    return this.parseOr();
+  }
+
+  /**
+   * ORDER BY句のパース
+   */
+  private parseOrderBy(): OrderByClause[] {
+    const clauses: OrderByClause[] = [];
+    
+    // Parse first order by clause
+    const field = this.parseFieldName();
+    let direction: 'asc' | 'desc' = 'asc';
+    
+    this.skipWhitespace();
+    if (this.consumeKeyword('desc')) {
+      direction = 'desc';
+    } else if (this.consumeKeyword('asc')) {
+      direction = 'asc';
+    }
+    
+    clauses.push({ field, direction });
+    
+    // Parse additional order by clauses
+    this.skipWhitespace();
+    while (this.consume(',')) {
+      this.skipWhitespace();
+      
+      const nextField = this.parseFieldName();
+      let nextDirection: 'asc' | 'desc' = 'asc';
+      
+      this.skipWhitespace();
+      if (this.consumeKeyword('desc')) {
+        nextDirection = 'desc';
+      } else if (this.consumeKeyword('asc')) {
+        nextDirection = 'asc';
+      }
+      
+      clauses.push({ field: nextField, direction: nextDirection });
+      this.skipWhitespace();
+    }
+    
+    return clauses;
+  }
+
+  /**
+   * LIMIT句のパース
+   */
+  private parseLimit(): number {
+    this.skipWhitespace();
+    if (!this.isNumber()) {
+      throw new Error(`Expected number for LIMIT at position ${this.pos}`);
+    }
+    
+    const limit = this.parseNumber();
+    
+    // kintone API制限チェック
+    if (limit < 1 || limit > 500 || !Number.isInteger(limit)) {
+      throw new Error(`LIMIT must be an integer between 1 and 500, got ${limit}`);
+    }
+    
+    return limit;
+  }
+
+  /**
+   * OFFSET句のパース
+   */
+  private parseOffset(): number {
+    this.skipWhitespace();
+    if (!this.isNumber()) {
+      throw new Error(`Expected number for OFFSET at position ${this.pos}`);
+    }
+    
+    const offset = this.parseNumber();
+    
+    // kintone API制限チェック
+    if (offset < 0 || offset > 10000 || !Number.isInteger(offset)) {
+      throw new Error(`OFFSET must be an integer between 0 and 10000, got ${offset}`);
+    }
+    
+    return offset;
+  }
+
+  /**
+   * キーワードを期待（エラーを投げる）
+   */
+  private expectKeyword(keyword: string): void {
+    if (!this.consumeKeyword(keyword)) {
+      throw new Error(`Expected keyword "${keyword}" at position ${this.pos}`);
+    }
   }
   
   /**
