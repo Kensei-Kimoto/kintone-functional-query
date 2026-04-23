@@ -1,62 +1,150 @@
-export { QueryBuilder } from './builder';
-export * from './types';
-export * from './functions';
-export * from './schemas';
-export { Schema as S } from 'effect';
-export { KintoneQueryParser } from './query-parser';
-export { Logger, type LogContext, type LogLevel } from './utils/logger';
-export { FieldReference, createRecordProxy } from './proxy';
-export { ASTToQueryBuilder, astToQuery } from './ast-builder';
-export { queryConverter, transformQuery, combineQueries, extractQueryComponents } from './bidirectional';
-
-import { QueryBuilder } from './builder';
-import * as functions from './functions';
-import { KintoneQueryParser } from './query-parser';
-
-export function kintoneQuery<Schema = Record<string, unknown>>(
-  lambda?: ((record: Schema, funcs: typeof functions) => unknown) | (() => unknown)
-): QueryBuilder<Schema> {
-  return new QueryBuilder<Schema>(lambda);
-}
-
-/**
- * kintoneクエリ文字列をWHERE句にパース (レガシー互換性維持)
- * @param query kintoneクエリ文字列
- * @returns パースされたWHERE式（Expression）またはnull
- */
-export function parseKintoneQuery(query: string) {
-  const parser = new KintoneQueryParser();
-  return parser.parse(query);
-}
-
-/**
- * kintoneクエリ文字列を完全なASTにパース (Phase 3: Complete Query Support)
- * @param query kintoneクエリ文字列
- * @returns パースされた完全なAST（CompleteQueryAST）またはnull
- */
-export function parseKintoneQueryComplete(query: string) {
-  const parser = new KintoneQueryParser();
-  return parser.parseComplete(query);
-}
-
-/**
- * kintoneクエリ文字列をパースして詳細な結果を取得
- * @param query kintoneクエリ文字列
- * @returns パース結果とメタデータ
- */
-export function parseKintoneQueryDetailed(query: string) {
-  const parser = new KintoneQueryParser();
-  const ast = parser.parseComplete(query);
-  
-  if (!ast) return null;
-  
-  return {
-    ast,
-    originalQuery: query,
-    hasWhere: !!ast.where,
-    hasOrderBy: !!ast.orderBy && ast.orderBy.length > 0,
-    hasLimit: typeof ast.limit === 'number',
-    hasOffset: typeof ast.offset === 'number',
-    sortFieldCount: ast.orderBy?.length ?? 0
-  };
-}
+export {
+  and,
+  ascending,
+  contains,
+  descending,
+  doesNotContain,
+  equals,
+  greaterThan,
+  greaterThanOrEqual,
+  isEmpty,
+  isIn,
+  isNotEmpty,
+  isNotIn,
+  lessThan,
+  lessThanOrEqual,
+  notEquals,
+  or,
+  rawCondition,
+  type CollectionCondition,
+  type CompileQueryInput,
+  type Condition,
+  type EmptyCondition,
+  type LogicalCondition,
+  type OrderClause,
+  type PatternCondition,
+} from "./conditions.ts";
+export { compileCondition, compileOrderBy, compileQuery } from "./compiler.ts";
+export {
+  attachment,
+  calculated,
+  category,
+  checkBox,
+  createdTime,
+  creator,
+  date,
+  dateTime,
+  dropDown,
+  groupSelect,
+  link,
+  modifier,
+  multiSelect,
+  numberField,
+  organizationSelect,
+  radioButton,
+  relatedRecords,
+  recordId,
+  recordNumber,
+  richText,
+  status,
+  statusAssignee,
+  subtable,
+  supportsQueryFunction,
+  text,
+  textArea,
+  time,
+  unknownField,
+  updatedTime,
+  userSelect,
+  type CategoryField,
+  type CheckBoxField,
+  type ComparisonField,
+  type CreatedTimeField,
+  type CreatorField,
+  type DateField,
+  type DateTimeField,
+  type DropDownField,
+  type EqualityField,
+  type FieldDescriptor,
+  type FieldKind,
+  type FieldScope,
+  type GroupSelectField,
+  type MembershipField,
+  type MultiLineTextField,
+  type MultiSelectField,
+  type ModifierField,
+  type NumberField,
+  type OrderingField,
+  type OrganizationSelectField,
+  type PatternField,
+  type QueryField,
+  type QueryOperatorToken,
+  type RadioButtonField,
+  type RelatedRecordsDescriptor,
+  type RecordIdField,
+  type RecordNumberField,
+  type SingleLineTextField,
+  type StatusAssigneeField,
+  type StatusField,
+  type SubtableDescriptor,
+  type TimeField,
+  type UpdatedTimeField,
+  type UserSelectField,
+} from "./fields.ts";
+export {
+  GENERATED_METADATA_PREFIX,
+  generateFieldModule,
+  readGeneratedMetadata,
+  readGeneratedMetadataFromFile,
+  type GenerateFieldModuleInput,
+  type GeneratedModuleMetadata,
+  type KintoneFormFieldProperty,
+  type KintoneFormFieldsSchema,
+} from "./codegen.ts";
+export {
+  fromToday,
+  isQueryFunctionCall,
+  lastMonth,
+  lastWeek,
+  lastYear,
+  loginUser,
+  loginUserQueryFunctionNames,
+  nextMonth,
+  nextWeek,
+  nextYear,
+  now,
+  primaryOrganization,
+  primaryOrganizationQueryFunctionNames,
+  temporalQueryFunctionNames,
+  thisMonth,
+  thisWeek,
+  thisYear,
+  today,
+  tomorrow,
+  yesterday,
+  type LoginUserFunctionCall,
+  type LoginUserQueryFunctionName,
+  type MonthBoundary,
+  type PrimaryOrganizationFunctionCall,
+  type PrimaryOrganizationQueryFunctionName,
+  type QueryFunctionArgument,
+  type QueryFunctionCall,
+  type QueryFunctionName,
+  type RelativePeriod,
+  type TemporalFunctionCall,
+  type TemporalQueryFunctionName,
+  type Weekday,
+} from "./query-functions.ts";
+export {
+  createSnapshotBundleFromClient,
+  createSnapshotBundleFromLiveKintone,
+  hydrateRelatedRecordFields,
+  hydrateRelatedRecordFieldsFromSchemas,
+  loadSchemaFromLiveKintone,
+  loadSchemaFromSnapshot,
+  type KintoneSchemaSource,
+  type KintoneAppFormFieldsClient,
+  type LiveSchemaSourceOptions,
+  type SnapshotSchemaBundle,
+  type SnapshotSchemaSourceOptions,
+} from "./schema-source.ts";
