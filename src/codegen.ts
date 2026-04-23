@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 
+import { QueryValidationError } from "./errors.ts";
+
 export interface KintoneFieldOption {
   readonly label?: string;
   readonly index?: number | string;
@@ -254,7 +256,16 @@ export const readGeneratedMetadata = (
     return null;
   }
 
-  return JSON.parse(firstLine.slice(GENERATED_METADATA_PREFIX.length)) as GeneratedModuleMetadata;
+  const payload = firstLine.slice(GENERATED_METADATA_PREFIX.length);
+
+  try {
+    return JSON.parse(payload) as GeneratedModuleMetadata;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new QueryValidationError(
+      `Failed to parse generated module metadata from the first line: ${payload}. ${reason}`,
+    );
+  }
 };
 
 export const readGeneratedMetadataFromFile = async (

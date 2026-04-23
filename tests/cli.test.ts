@@ -214,3 +214,33 @@ test("CLI can generate related-record fields from a bundled snapshot", async () 
 
   assert.match(result.stdout, /Schema is up to date/u);
 });
+
+test("CLI rejects unsupported live-fetch language values", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "kfq-"));
+  const generatedPath = join(tempDir, "generated", "customer-app.fields.ts");
+
+  await assert.rejects(
+    execFile(
+      process.execPath,
+      [
+        "./src/cli/index.ts",
+        "generate",
+        "--base-url",
+        "https://example.cybozu.com",
+        "--app-id",
+        "42",
+        "--api-token",
+        "dummy-token",
+        "--lang",
+        "fr",
+        "--out",
+        generatedPath,
+      ],
+      { cwd: workspaceRoot },
+    ),
+    (error: NodeJS.ErrnoException & { stderr?: string }) => {
+      assert.match(String(error.stderr), /Invalid --lang "fr"/u);
+      return true;
+    },
+  );
+});

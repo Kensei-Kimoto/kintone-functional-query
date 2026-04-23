@@ -36,10 +36,10 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "generate": "node ./src/cli/index.ts generate",

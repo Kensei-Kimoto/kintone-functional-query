@@ -44,17 +44,26 @@ export interface SnapshotBundleFromClientOptions {
   readonly lang?: LiveSchemaSourceOptions["lang"];
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isKintoneFormFieldPropertyLike = (value: unknown): value is KintoneFormFieldProperty =>
+  isPlainObject(value) && typeof value.type === "string";
+
 const isKintoneFormFieldsSchema = (value: unknown): value is KintoneFormFieldsSchema =>
-  typeof value === "object" &&
-  value !== null &&
-  "properties" in value &&
-  "revision" in value;
+  isPlainObject(value) &&
+  typeof value.revision === "string" &&
+  isPlainObject(value.properties) &&
+  Object.values(value.properties).every(isKintoneFormFieldPropertyLike);
 
 const isSnapshotSchemaBundle = (value: unknown): value is SnapshotSchemaBundle =>
-  typeof value === "object" &&
-  value !== null &&
+  isPlainObject(value) &&
+  (value.appId === undefined || typeof value.appId === "string") &&
   "schema" in value &&
-  isKintoneFormFieldsSchema(value.schema);
+  isKintoneFormFieldsSchema(value.schema) &&
+  (value.relatedApps === undefined ||
+    (isPlainObject(value.relatedApps) &&
+      Object.values(value.relatedApps).every(isKintoneFormFieldsSchema)));
 
 const fetchFormFields = async (
   appClient: KintoneAppFormFieldsClient,

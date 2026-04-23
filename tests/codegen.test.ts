@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  GENERATED_METADATA_PREFIX,
   generateFieldModule,
   readGeneratedMetadata,
   type KintoneFormFieldsSchema,
 } from "../src/index.ts";
+import { QueryValidationError } from "../src/errors.ts";
 
 test("generateFieldModule emits metadata, system fields, and typed field descriptors", () => {
   const schema: KintoneFormFieldsSchema = {
@@ -112,5 +114,19 @@ test("generateFieldModule falls back to unknown related-record fields when neste
   assert.match(
     source,
     /company_name: unknownField\("Company_DB\.company_name", "UNKNOWN", \{ scope: "RELATED_RECORDS" \}\)/u,
+  );
+});
+
+test("readGeneratedMetadata throws a typed error for malformed metadata", () => {
+  assert.throws(
+    () =>
+      readGeneratedMetadata(
+        `${GENERATED_METADATA_PREFIX}{"appId":"42","revision":"17","generatedAt":}\nexport const fields = {};`,
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof QueryValidationError);
+      assert.match(error.message, /Failed to parse generated module metadata/u);
+      return true;
+    },
   );
 });

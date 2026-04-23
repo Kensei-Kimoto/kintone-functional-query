@@ -114,7 +114,8 @@ Compare the generated module metadata with the current schema snapshot:
 ```bash
 npx kintone-functional-query check-schema \
   --generated ./generated/customer-app.fields.ts \
-  --snapshot ./schema/customer-app.json
+  --snapshot ./schema/customer-app.json \
+  --app-id 42
 ```
 
 ## Usage
@@ -228,7 +229,3 @@ const records = await client.record.getAllRecordsWithCursor({
 2. Commit the bundle snapshot if you want offline regeneration and stable review diffs.
 3. Run `generate` from that snapshot in normal development.
 4. Run `check-schema` in CI or before release to catch schema drift.
-
-## Design Notes
-
-The design memo lives at [docs/kintone-functional-query-v2.md](./docs/kintone-functional-query-v2.md).

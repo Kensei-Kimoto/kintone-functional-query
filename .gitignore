@@ -2,7 +2,8 @@ node_modules
 dist
 coverage
 
-.env
+.env*
+!.env.example
 scratch/live.bundle.json
 scratch/live.fields.ts
 scratch/live-client-smoke.ts

@@ -17,6 +17,13 @@ import {
 
 type FlagMap = Map<string, string | true>;
 type EnvMap = NodeJS.ProcessEnv;
+const supportedLiveSchemaLanguages = ["default", "en", "zh", "ja", "user"] as const;
+type SupportedLiveSchemaLanguage = (typeof supportedLiveSchemaLanguages)[number];
+
+const isSupportedLiveSchemaLanguage = (
+  value: string,
+): value is SupportedLiveSchemaLanguage =>
+  supportedLiveSchemaLanguages.includes(value as SupportedLiveSchemaLanguage);
 
 const parseFlags = (argv: readonly string[]): FlagMap => {
   const flags: FlagMap = new Map();
@@ -94,6 +101,12 @@ const loadLiveOptions = (flags: FlagMap, env: EnvMap) => {
   const guestSpaceId = getStringInput(flags, "guest-space-id", env, "KINTONE_GUEST_SPACE_ID");
   const lang = getStringInput(flags, "lang", env, "KINTONE_LANG");
 
+  if (lang !== undefined && !isSupportedLiveSchemaLanguage(lang)) {
+    throw new CliUsageError(
+      `Invalid --lang "${lang}". Expected one of: ${supportedLiveSchemaLanguages.join(", ")}.`,
+    );
+  }
+
   return {
     baseUrl: requireStringInput(flags, "base-url", env, "KINTONE_BASE_URL"),
     appId: requireStringInput(flags, "app-id", env, "KINTONE_APP_ID"),
@@ -101,9 +114,7 @@ const loadLiveOptions = (flags: FlagMap, env: EnvMap) => {
     ...(username !== undefined ? { username } : {}),
     ...(password !== undefined ? { password } : {}),
     ...(guestSpaceId !== undefined ? { guestSpaceId } : {}),
-    ...(lang === "default" || lang === "en" || lang === "zh" || lang === "ja" || lang === "user"
-      ? { lang }
-      : {}),
+    ...(lang !== undefined ? { lang } : {}),
     } satisfies Parameters<typeof loadSchemaFromLiveKintone>[0];
 };
 
@@ -142,7 +153,7 @@ const printHelp = (): void => {
     "  kintone-functional-query snapshot --base-url https://example.cybozu.com --app-id 42 --api-token <token> --out ./schema/app.bundle.json",
     "",
     "Check schema drift:",
-    "  kintone-functional-query check-schema --generated ./generated/app.fields.ts --snapshot ./schema.json",
+    "  kintone-functional-query check-schema --generated ./generated/app.fields.ts --snapshot ./schema.json --app-id 42",
   ];
 
   console.log(lines.join("\n"));

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import type { KintoneFormFieldProperty, KintoneFormFieldsSchema } from "../src/codegen.ts";
+import { QueryValidationError } from "../src/errors.ts";
 import {
   createSnapshotBundleFromClient,
   hydrateRelatedRecordFields,
@@ -204,4 +205,31 @@ test("createSnapshotBundleFromClient collects related app schemas once per app",
   assert.equal(bundle.schema.revision, "17");
   assert.equal(bundle.relatedApps?.["100"]?.revision, "7");
   assert.equal(bundle.relatedApps?.["200"]?.revision, "9");
+});
+
+test("loadSchemaFromSnapshot rejects malformed snapshot shapes with a typed error", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "kfq-schema-"));
+  const snapshotPath = join(tempDir, "invalid-schema.json");
+
+  await writeFile(
+    snapshotPath,
+    JSON.stringify(
+      {
+        revision: "17",
+        properties: null,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
+  await assert.rejects(
+    loadSchemaFromSnapshot({ snapshotPath }),
+    (error: unknown) => {
+      assert.ok(error instanceof QueryValidationError);
+      assert.match(error.message, /is not a valid Get Form Fields response or snapshot bundle/u);
+      return true;
+    },
+  );
 });

@@ -39,6 +39,14 @@ export type QueryFunctionName =
   | PrimaryOrganizationQueryFunctionName
   | TemporalQueryFunctionName;
 
+const queryFunctionNames = [
+  ...loginUserQueryFunctionNames,
+  ...primaryOrganizationQueryFunctionNames,
+  ...temporalQueryFunctionNames,
+] as const satisfies readonly QueryFunctionName[];
+
+const queryFunctionNameSet: ReadonlySet<string> = new Set(queryFunctionNames);
+
 export interface QueryKeyword {
   readonly kind: "keyword";
   readonly value: string;
@@ -70,11 +78,30 @@ const createFunction = <Name extends QueryFunctionName>(
   args,
 });
 
+const isQueryKeyword = (value: unknown): value is QueryKeyword =>
+  typeof value === "object" &&
+  value !== null &&
+  "kind" in value &&
+  value.kind === "keyword" &&
+  "value" in value &&
+  typeof value.value === "string";
+
+const isQueryFunctionArgument = (value: unknown): value is QueryFunctionArgument =>
+  typeof value === "number" ||
+  typeof value === "string" ||
+  isQueryKeyword(value);
+
 export const isQueryFunctionCall = (value: unknown): value is QueryFunctionCall =>
   typeof value === "object" &&
   value !== null &&
   "kind" in value &&
-  value.kind === "function";
+  value.kind === "function" &&
+  "name" in value &&
+  typeof value.name === "string" &&
+  queryFunctionNameSet.has(value.name) &&
+  "args" in value &&
+  Array.isArray(value.args) &&
+  value.args.every(isQueryFunctionArgument);
 
 const optionalWeekday = (day?: Weekday): readonly QueryFunctionArgument[] =>
   day === undefined ? [] : [keyword(day)];
