@@ -1,0 +1,57 @@
+{
+  "appId": "42",
+  "schema": {
+    "revision": "17",
+    "properties": {
+      "CustomerName": {
+        "type": "SINGLE_LINE_TEXT",
+        "code": "CustomerName"
+      },
+      "ContractDate": {
+        "type": "DATE",
+        "code": "ContractDate"
+      },
+      "Status": {
+        "type": "DROP_DOWN",
+        "code": "Status",
+        "options": {
+          "Qualified": {
+            "index": 0
+          },
+          "Won": {
+            "index": 1
+          }
+        }
+      },
+      "Company_DB": {
+        "type": "REFERENCE_TABLE",
+        "code": "Company_DB",
+        "referenceTable": {
+          "relatedApp": {
+            "app": "100",
+            "code": "companies"
+          },
+          "displayFields": [
+            "company_name",
+            "created_on"
+          ]
+        }
+      }
+    }
+  },
+  "relatedApps": {
+    "100": {
+      "revision": "7",
+      "properties": {
+        "company_name": {
+          "type": "SINGLE_LINE_TEXT",
+          "code": "company_name"
+        },
+        "created_on": {
+          "type": "DATE",
+          "code": "created_on"
+        }
+      }
+    }
+  }
+}
