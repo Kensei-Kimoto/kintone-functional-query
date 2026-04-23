@@ -6,3 +6,4 @@ coverage
 scratch/live.bundle.json
 scratch/live.fields.ts
 scratch/live-client-smoke.ts
+scratch/demo/generated-dist/
