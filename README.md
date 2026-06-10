@@ -29,7 +29,7 @@ The public API shape is in place, and the core flow has been verified against a 
 - snapshot bundle generation
 - TypeScript module generation
 - schema drift checks
-- compiled `condition` and `query` strings used through `@kintone/rest-api-client`
+- compiled `condition` and `query` strings used through the Kintone REST API
 
 This repository is currently being refreshed as the v2 reboot line on GitHub first.
 npm publication for v2 will come later.
@@ -37,27 +37,37 @@ npm publication for v2 will come later.
 ## Install
 
 ```bash
+git clone https://github.com/Kensei-Kimoto/kintone-functional-query.git
+cd kintone-functional-query
 npm install
+npm run build
 ```
 
-The CLI can read live-fetch settings from environment variables too:
+The v2 reboot is not published to npm yet. Run the CLI from a local clone:
+
+```bash
+node ./dist/cli/index.js --help
+```
+
+The CLI can read live-fetch connection and password-auth settings from environment variables too.
+Pass `--app-id` explicitly for each command so generated artifacts always name their target app.
 
 ```bash
 KINTONE_BASE_URL=
-KINTONE_APP_ID=
-KINTONE_API_TOKEN=
 KINTONE_USERNAME=
 KINTONE_PASSWORD=
-KINTONE_GUEST_SPACE_ID=
-KINTONE_LANG=
 ```
+
+API token authentication is intentionally not supported by the live schema fetcher. Related-record
+field expansion may require reading datasource apps discovered at runtime, so username/password
+authentication provides a clearer and less error-prone workflow for v2 schema generation.
 
 ## Generate Schema
 
 Generate from a saved `Get Form Fields` JSON snapshot:
 
 ```bash
-npx kintone-functional-query generate \
+node ./dist/cli/index.js generate \
   --snapshot ./schema/customer-app.json \
   --app-id 42 \
   --out ./generated/customer-app.fields.ts
@@ -78,28 +88,42 @@ If you want typed related-record fields from snapshot mode too, you can pass a b
 Generate by fetching the schema directly from Kintone:
 
 ```bash
-npx kintone-functional-query generate \
+node ./dist/cli/index.js generate \
   --base-url https://example.cybozu.com \
   --app-id 42 \
-  --api-token $KINTONE_API_TOKEN \
+  --username $KINTONE_USERNAME \
+  --password $KINTONE_PASSWORD \
   --out ./generated/customer-app.fields.ts
 ```
 
 Write a reusable bundle snapshot from live Kintone:
 
 ```bash
-npx kintone-functional-query snapshot \
+node ./dist/cli/index.js snapshot \
   --base-url https://example.cybozu.com \
   --app-id 42 \
-  --api-token $KINTONE_API_TOKEN \
+  --username $KINTONE_USERNAME \
+  --password $KINTONE_PASSWORD \
+  --out ./schema/customer-app.bundle.json
+```
+
+For guest space apps, pass the guest space ID with the app-specific command:
+
+```bash
+node ./dist/cli/index.js snapshot \
+  --base-url https://example.cybozu.com \
+  --guest-space-id 12 \
+  --app-id 42 \
+  --username $KINTONE_USERNAME \
+  --password $KINTONE_PASSWORD \
   --out ./schema/customer-app.bundle.json
 ```
 
 If you prefer `.env`, Node 22 can load it directly:
 
 ```bash
-node --env-file=.env ./src/cli/index.ts snapshot --out ./schema/customer-app.bundle.json
-node --env-file=.env ./src/cli/index.ts generate --out ./generated/customer-app.fields.ts
+node --env-file=.env ./dist/cli/index.js snapshot --app-id 42 --out ./schema/customer-app.bundle.json
+node --env-file=.env ./dist/cli/index.js generate --app-id 42 --out ./generated/customer-app.fields.ts
 ```
 
 When generating from live Kintone, related-record fields are expanded from the datasource App's
@@ -112,7 +136,7 @@ will still fall back to `unknownField(...)` entries for related-record fields.
 Compare the generated module metadata with the current schema snapshot:
 
 ```bash
-npx kintone-functional-query check-schema \
+node ./dist/cli/index.js check-schema \
   --generated ./generated/customer-app.fields.ts \
   --snapshot ./schema/customer-app.json \
   --app-id 42
@@ -161,7 +185,6 @@ Use `compileCondition()` when the Kintone client expects only the condition part
 This is a good fit for `getAllRecordsWithId()`:
 
 ```ts
-import { KintoneRestAPIClient } from "@kintone/rest-api-client";
 import {
   and,
   compileCondition,
@@ -171,11 +194,6 @@ import {
 } from "kintone-functional-query";
 import { fields } from "./generated/customer-app.fields.js";
 
-const client = new KintoneRestAPIClient({
-  baseUrl: "https://example.cybozu.com",
-  auth: { apiToken: process.env.KINTONE_API_TOKEN! },
-});
-
 const condition = compileCondition(
   and(
     greaterThanOrEqual(fields.ContractDate, today()),
@@ -183,6 +201,7 @@ const condition = compileCondition(
   ),
 );
 
+// Use the compiled condition with your preferred Kintone REST client.
 const records = await client.record.getAllRecordsWithId({
   app: "42",
   condition,

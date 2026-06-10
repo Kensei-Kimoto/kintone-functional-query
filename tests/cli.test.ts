@@ -69,24 +69,23 @@ test("CLI can generate a field module and verify schema drift from a snapshot", 
   assert.match(result.stdout, /Schema is up to date/u);
 });
 
-test("CLI can read app id from environment variables for snapshot mode", async () => {
+test("CLI can read app id from bundled snapshot metadata", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "kfq-"));
   const snapshotPath = join(tempDir, "schema.json");
   const generatedPath = join(tempDir, "generated", "customer-app.fields.ts");
-  const env = {
-    ...process.env,
-    KINTONE_APP_ID: "42",
-  };
 
   await writeFile(
     snapshotPath,
     JSON.stringify(
       {
-        revision: "17",
-        properties: {
-          CustomerName: {
-            type: "SINGLE_LINE_TEXT",
-            code: "CustomerName",
+        appId: "42",
+        schema: {
+          revision: "17",
+          properties: {
+            CustomerName: {
+              type: "SINGLE_LINE_TEXT",
+              code: "CustomerName",
+            },
           },
         },
       },
@@ -106,7 +105,7 @@ test("CLI can read app id from environment variables for snapshot mode", async (
       "--out",
       generatedPath,
     ],
-    { cwd: workspaceRoot, env },
+    { cwd: workspaceRoot },
   );
 
   const generatedSource = await readFile(generatedPath, "utf8");
@@ -122,7 +121,7 @@ test("CLI can read app id from environment variables for snapshot mode", async (
       "--snapshot",
       snapshotPath,
     ],
-    { cwd: workspaceRoot, env },
+    { cwd: workspaceRoot },
   );
 
   assert.match(result.stdout, /Schema is up to date\. appId=42 revision=17/u);
@@ -215,7 +214,7 @@ test("CLI can generate related-record fields from a bundled snapshot", async () 
   assert.match(result.stdout, /Schema is up to date/u);
 });
 
-test("CLI rejects unsupported live-fetch language values", async () => {
+test("CLI requires app-id as an explicit live-fetch flag", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "kfq-"));
   const generatedPath = join(tempDir, "generated", "customer-app.fields.ts");
 
@@ -227,19 +226,17 @@ test("CLI rejects unsupported live-fetch language values", async () => {
         "generate",
         "--base-url",
         "https://example.cybozu.com",
-        "--app-id",
-        "42",
-        "--api-token",
-        "dummy-token",
-        "--lang",
-        "fr",
+        "--username",
+        "user",
+        "--password",
+        "pass",
         "--out",
         generatedPath,
       ],
-      { cwd: workspaceRoot },
+      { cwd: workspaceRoot, env: { ...process.env, KINTONE_APP_ID: "42" } },
     ),
     (error: NodeJS.ErrnoException & { stderr?: string }) => {
-      assert.match(String(error.stderr), /Invalid --lang "fr"/u);
+      assert.match(String(error.stderr), /Missing required flag --app-id/u);
       return true;
     },
   );

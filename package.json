@@ -47,9 +47,6 @@
     "check-schema": "node ./src/cli/index.ts check-schema",
     "test": "node --test tests/*.test.ts"
   },
-  "dependencies": {
-    "@kintone/rest-api-client": "^5.7.4"
-  },
   "devDependencies": {
     "@types/node": "^22.13.1",
     "typescript": "^5.8.3"

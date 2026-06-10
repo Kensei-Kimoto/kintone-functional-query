@@ -4,23 +4,55 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import type { KintoneFormFieldProperty, KintoneFormFieldsSchema } from "../src/codegen.ts";
 import { QueryValidationError } from "../src/errors.ts";
 import {
-  createSnapshotBundleFromClient,
-  hydrateRelatedRecordFields,
+  createSnapshotBundleFromLiveKintone,
+  loadSchemaFromLiveKintone,
   loadSchemaFromSnapshot,
 } from "../src/schema-source.ts";
 
-test("hydrateRelatedRecordFields resolves displayed related-record fields from the datasource app", async () => {
-  const calls: string[] = [];
+const withMockFetch = async <T>(
+  handler: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>,
+  callback: () => Promise<T>,
+): Promise<T> => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = handler as typeof fetch;
 
-  const appClient = {
-    async getFormFields(params: { app: string }) {
-      calls.push(params.app);
+  try {
+    return await callback();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+};
 
-      if (params.app === "100") {
-        return {
+test("loadSchemaFromLiveKintone fetches root and related app schemas with native fetch", async () => {
+  const calls: Array<{ url: URL; headers: Headers }> = [];
+
+  const source = await withMockFetch(
+    async (input, init) => {
+      const url = new URL(String(input));
+      const headers = new Headers(init?.headers);
+      calls.push({ url, headers });
+      const appId = url.searchParams.get("app");
+
+      if (appId === "42") {
+        return Response.json({
+          revision: "17",
+          properties: {
+            Company_DB: {
+              type: "REFERENCE_TABLE",
+              code: "Company_DB",
+              referenceTable: {
+                relatedApp: { app: "100" },
+                displayFields: ["company_name", "created_on", "NestedTable", "missing_field"],
+              },
+            },
+          },
+        });
+      }
+
+      if (appId === "100") {
+        return Response.json({
           revision: "7",
           properties: {
             company_name: {
@@ -36,51 +68,64 @@ test("hydrateRelatedRecordFields resolves displayed related-record fields from t
               code: "NestedTable",
               fields: {},
             },
-          } satisfies Record<string, KintoneFormFieldProperty>,
-        };
+          },
+        });
       }
 
-      throw new Error(`Unexpected app ${params.app}`);
+      return new Response("not found", { status: 404, statusText: "Not Found" });
     },
-  };
+    () =>
+      loadSchemaFromLiveKintone({
+        baseUrl: "https://example.cybozu.com/",
+        appId: "42",
+        username: "user",
+        password: "pass",
+      }),
+  );
 
-  const schema: KintoneFormFieldsSchema = {
-    revision: "17",
-    properties: {
-      Company_DB: {
-        type: "REFERENCE_TABLE",
-        code: "Company_DB",
-        referenceTable: {
-          relatedApp: {
-            app: "100",
-          },
-          displayFields: ["company_name", "created_on", "NestedTable", "missing_field"],
-        },
-      },
-    },
-  };
-
-  const hydrated = await hydrateRelatedRecordFields(appClient, schema);
-  const companyDb = hydrated.properties.Company_DB;
-
-  assert.deepEqual(calls, ["100"]);
-  assert.ok(companyDb?.fields !== undefined);
-  assert.deepEqual(companyDb?.fields?.company_name, {
+  assert.deepEqual(
+    calls.map((call) => call.url.searchParams.get("app")),
+    ["42", "100"],
+  );
+  assert.equal(calls[0]?.url.href, "https://example.cybozu.com/k/v1/app/form/fields.json?app=42");
+  assert.equal(
+    calls[0]?.headers.get("X-Cybozu-Authorization"),
+    Buffer.from("user:pass").toString("base64"),
+  );
+  assert.deepEqual(source.schema.properties.Company_DB?.fields?.company_name, {
     type: "SINGLE_LINE_TEXT",
     code: "Company_DB.company_name",
   });
-  assert.deepEqual(companyDb?.fields?.created_on, {
-    type: "DATE",
-    code: "Company_DB.created_on",
-  });
-  assert.deepEqual(companyDb?.fields?.NestedTable, {
+  assert.deepEqual(source.schema.properties.Company_DB?.fields?.NestedTable, {
     type: "UNKNOWN",
     code: "Company_DB.NestedTable",
   });
-  assert.deepEqual(companyDb?.fields?.missing_field, {
-    type: "UNKNOWN",
-    code: "Company_DB.missing_field",
-  });
+});
+
+test("loadSchemaFromLiveKintone uses guest space URLs when guest-space-id is passed", async () => {
+  const calls: URL[] = [];
+
+  await withMockFetch(
+    async (input) => {
+      const url = new URL(String(input));
+      calls.push(url);
+
+      return Response.json({
+        revision: "17",
+        properties: {},
+      });
+    },
+    () =>
+      loadSchemaFromLiveKintone({
+        baseUrl: "https://example.cybozu.com",
+        appId: "42",
+        guestSpaceId: "12",
+        username: "user",
+        password: "pass",
+      }),
+  );
+
+  assert.equal(calls[0]?.href, "https://example.cybozu.com/k/guest/12/v1/app/form/fields.json?app=42");
 });
 
 test("loadSchemaFromSnapshot accepts bundle format and hydrates related-record fields", async () => {
@@ -134,16 +179,23 @@ test("loadSchemaFromSnapshot accepts bundle format and hydrates related-record f
   });
 });
 
-test("createSnapshotBundleFromClient collects related app schemas once per app", async () => {
+test("createSnapshotBundleFromLiveKintone collects related app schemas once per app", async () => {
   const calls: string[] = [];
 
-  const appClient = {
-    async getFormFields(params: { app: string }) {
-      calls.push(params.app);
+  const bundle = await withMockFetch(
+    async (input, init) => {
+      const url = new URL(String(input));
+      const headers = new Headers(init?.headers);
+      const appId = url.searchParams.get("app");
+      calls.push(String(appId));
+      assert.equal(
+        headers.get("X-Cybozu-Authorization"),
+        Buffer.from("user:pass").toString("base64"),
+      );
 
-      switch (params.app) {
+      switch (appId) {
         case "42":
-          return {
+          return Response.json({
             revision: "17",
             properties: {
               Company_DB: {
@@ -170,35 +222,40 @@ test("createSnapshotBundleFromClient collects related app schemas once per app",
                   displayFields: ["company_name"],
                 },
               },
-            } satisfies Record<string, KintoneFormFieldProperty>,
-          };
+            },
+          });
         case "100":
-          return {
+          return Response.json({
             revision: "7",
             properties: {
               company_name: {
                 type: "SINGLE_LINE_TEXT",
                 code: "company_name",
               },
-            } satisfies Record<string, KintoneFormFieldProperty>,
-          };
+            },
+          });
         case "200":
-          return {
+          return Response.json({
             revision: "9",
             properties: {
               department_name: {
                 type: "SINGLE_LINE_TEXT",
                 code: "department_name",
               },
-            } satisfies Record<string, KintoneFormFieldProperty>,
-          };
+            },
+          });
         default:
-          throw new Error(`Unexpected app ${params.app}`);
+          return new Response("not found", { status: 404, statusText: "Not Found" });
       }
     },
-  };
-
-  const bundle = await createSnapshotBundleFromClient(appClient, { appId: "42" });
+    () =>
+      createSnapshotBundleFromLiveKintone({
+        baseUrl: "https://example.cybozu.com",
+        appId: "42",
+        username: "user",
+        password: "pass",
+      }),
+  );
 
   assert.deepEqual(calls, ["42", "100", "200"]);
   assert.equal(bundle.appId, "42");

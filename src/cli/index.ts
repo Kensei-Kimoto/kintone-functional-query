@@ -17,13 +17,6 @@ import {
 
 type FlagMap = Map<string, string | true>;
 type EnvMap = NodeJS.ProcessEnv;
-const supportedLiveSchemaLanguages = ["default", "en", "zh", "ja", "user"] as const;
-type SupportedLiveSchemaLanguage = (typeof supportedLiveSchemaLanguages)[number];
-
-const isSupportedLiveSchemaLanguage = (
-  value: string,
-): value is SupportedLiveSchemaLanguage =>
-  supportedLiveSchemaLanguages.includes(value as SupportedLiveSchemaLanguage);
 
 const parseFlags = (argv: readonly string[]): FlagMap => {
   const flags: FlagMap = new Map();
@@ -95,26 +88,16 @@ const requireStringInput = (
 };
 
 const loadLiveOptions = (flags: FlagMap, env: EnvMap) => {
-  const apiToken = getStringInput(flags, "api-token", env, "KINTONE_API_TOKEN");
   const username = getStringInput(flags, "username", env, "KINTONE_USERNAME");
   const password = getStringInput(flags, "password", env, "KINTONE_PASSWORD");
-  const guestSpaceId = getStringInput(flags, "guest-space-id", env, "KINTONE_GUEST_SPACE_ID");
-  const lang = getStringInput(flags, "lang", env, "KINTONE_LANG");
-
-  if (lang !== undefined && !isSupportedLiveSchemaLanguage(lang)) {
-    throw new CliUsageError(
-      `Invalid --lang "${lang}". Expected one of: ${supportedLiveSchemaLanguages.join(", ")}.`,
-    );
-  }
+  const guestSpaceId = getStringInput(flags, "guest-space-id", env);
 
   return {
     baseUrl: requireStringInput(flags, "base-url", env, "KINTONE_BASE_URL"),
-    appId: requireStringInput(flags, "app-id", env, "KINTONE_APP_ID"),
-    ...(apiToken !== undefined ? { apiToken } : {}),
+    appId: requireStringInput(flags, "app-id", env),
     ...(username !== undefined ? { username } : {}),
     ...(password !== undefined ? { password } : {}),
     ...(guestSpaceId !== undefined ? { guestSpaceId } : {}),
-    ...(lang !== undefined ? { lang } : {}),
     } satisfies Parameters<typeof loadSchemaFromLiveKintone>[0];
 };
 
@@ -125,7 +108,7 @@ const loadSchemaSource = async (
   const snapshotPath = getStringInput(flags, "snapshot", env);
 
   if (snapshotPath !== undefined) {
-    const appId = getStringInput(flags, "app-id", env, "KINTONE_APP_ID");
+    const appId = getStringInput(flags, "app-id", env);
     return loadSchemaFromSnapshot(
       appId !== undefined ? { snapshotPath, appId } : { snapshotPath },
     );
@@ -147,10 +130,10 @@ const printHelp = (): void => {
     "  kintone-functional-query generate --snapshot ./schema.json --app-id 42 --out ./generated/app.fields.ts",
     "",
     "Generate from live Kintone:",
-    "  kintone-functional-query generate --base-url https://example.cybozu.com --app-id 42 --api-token <token> --out ./generated/app.fields.ts",
+    "  kintone-functional-query generate --base-url https://example.cybozu.com --app-id 42 --username <user> --password <password> --out ./generated/app.fields.ts",
     "",
     "Write a schema snapshot bundle from live Kintone:",
-    "  kintone-functional-query snapshot --base-url https://example.cybozu.com --app-id 42 --api-token <token> --out ./schema/app.bundle.json",
+    "  kintone-functional-query snapshot --base-url https://example.cybozu.com --app-id 42 --username <user> --password <password> --out ./schema/app.bundle.json",
     "",
     "Check schema drift:",
     "  kintone-functional-query check-schema --generated ./generated/app.fields.ts --snapshot ./schema.json --app-id 42",

@@ -136,14 +136,11 @@ export {
   type Weekday,
 } from "./query-functions.ts";
 export {
-  createSnapshotBundleFromClient,
   createSnapshotBundleFromLiveKintone,
-  hydrateRelatedRecordFields,
   hydrateRelatedRecordFieldsFromSchemas,
   loadSchemaFromLiveKintone,
   loadSchemaFromSnapshot,
   type KintoneSchemaSource,
-  type KintoneAppFormFieldsClient,
   type LiveSchemaSourceOptions,
   type SnapshotSchemaBundle,
   type SnapshotSchemaSourceOptions,

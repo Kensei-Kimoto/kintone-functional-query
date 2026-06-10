@@ -22,26 +22,9 @@ export interface SnapshotSchemaBundle {
 export interface LiveSchemaSourceOptions {
   readonly baseUrl: string;
   readonly appId: string;
-  readonly apiToken?: string;
   readonly username?: string;
   readonly password?: string;
   readonly guestSpaceId?: string;
-  readonly lang?: "default" | "en" | "zh" | "ja" | "user";
-}
-
-export interface KintoneAppFormFieldsClient {
-  getFormFields(params: {
-    app: string;
-    lang?: "default" | "en" | "zh" | "ja" | "user";
-  }): Promise<{
-    properties: Readonly<Record<string, KintoneFormFieldProperty>>;
-    revision: string;
-  }>;
-}
-
-export interface SnapshotBundleFromClientOptions {
-  readonly appId: string;
-  readonly lang?: LiveSchemaSourceOptions["lang"];
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -65,17 +48,69 @@ const isSnapshotSchemaBundle = (value: unknown): value is SnapshotSchemaBundle =
     (isPlainObject(value.relatedApps) &&
       Object.values(value.relatedApps).every(isKintoneFormFieldsSchema)));
 
-const fetchFormFields = async (
-  appClient: KintoneAppFormFieldsClient,
+const normalizeBaseUrl = (baseUrl: string): string => baseUrl.replace(/\/+$/u, "");
+
+const buildFormFieldsUrl = (
+  options: Pick<LiveSchemaSourceOptions, "baseUrl" | "guestSpaceId">,
   appId: string,
-  lang?: LiveSchemaSourceOptions["lang"],
+): URL => {
+  const path = options.guestSpaceId === undefined
+    ? "/k/v1/app/form/fields.json"
+    : `/k/guest/${encodeURIComponent(options.guestSpaceId)}/v1/app/form/fields.json`;
+  const url = new URL(path, `${normalizeBaseUrl(options.baseUrl)}/`);
+
+  url.searchParams.set("app", appId);
+
+  return url;
+};
+
+const buildAuthHeaders = (
+  options: Pick<LiveSchemaSourceOptions, "username" | "password">,
+): Headers => {
+  const headers = new Headers({
+    "Accept": "application/json",
+  });
+
+  if (options.username !== undefined && options.password !== undefined) {
+    headers.set(
+      "X-Cybozu-Authorization",
+      Buffer.from(`${options.username}:${options.password}`).toString("base64"),
+    );
+    return headers;
+  }
+
+  throw new CliUsageError(
+    "Live schema fetch requires both --username and --password.",
+  );
+};
+
+const fetchFormFieldsFromKintone = async (
+  options: LiveSchemaSourceOptions,
+  appId: string,
 ): Promise<KintoneFormFieldsSchema> => {
-  const request = lang === undefined ? { app: appId } : { app: appId, lang };
-  const response = await appClient.getFormFields(request);
+  const url = buildFormFieldsUrl(options, appId);
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildAuthHeaders(options),
+  });
+
+  if (!response.ok) {
+    throw new QueryValidationError(
+      `Failed to fetch form fields for app "${appId}": HTTP ${response.status} ${response.statusText}.`,
+    );
+  }
+
+  const parsed = await response.json() as unknown;
+
+  if (!isKintoneFormFieldsSchema(parsed)) {
+    throw new QueryValidationError(
+      `Kintone form fields response for app "${appId}" is not a valid Get Form Fields response.`,
+    );
+  }
 
   return {
-    properties: response.properties,
-    revision: response.revision,
+    properties: parsed.properties,
+    revision: parsed.revision,
   };
 };
 
@@ -189,68 +224,24 @@ export const hydrateRelatedRecordFieldsFromSchemas = (
   };
 };
 
-export const createSnapshotBundleFromClient = async (
-  appClient: KintoneAppFormFieldsClient,
-  options: SnapshotBundleFromClientOptions,
+const createSnapshotBundleFromLiveOptions = async (
+  options: LiveSchemaSourceOptions,
 ): Promise<SnapshotSchemaBundle> => {
-  const schema = await fetchFormFields(appClient, options.appId, options.lang);
+  const schema = await fetchFormFieldsFromKintone(options, String(options.appId));
   const relatedAppIds = collectRelatedAppIds(schema);
   const relatedApps = Object.fromEntries(
     await Promise.all(
       relatedAppIds.map(async (relatedAppId) => [
         relatedAppId,
-        await fetchFormFields(appClient, relatedAppId, options.lang),
+        await fetchFormFieldsFromKintone(options, relatedAppId),
       ]),
     ),
   );
 
   return {
-    appId: options.appId,
+    appId: String(options.appId),
     schema,
     ...(Object.keys(relatedApps).length > 0 ? { relatedApps } : {}),
-  };
-};
-
-export const hydrateRelatedRecordFields = async (
-  appClient: KintoneAppFormFieldsClient,
-  schema: KintoneFormFieldsSchema,
-  options?: {
-    readonly lang?: LiveSchemaSourceOptions["lang"];
-  },
-): Promise<KintoneFormFieldsSchema> => {
-  const relatedSchemaCache = new Map<string, KintoneFormFieldsSchema>();
-  const properties = await Promise.all(
-    Object.entries(schema.properties).map(async ([fieldCode, property]) => {
-      if (
-        property.type !== "REFERENCE_TABLE" ||
-        property.referenceTable === undefined ||
-        property.referenceTable === null ||
-        property.referenceTable.relatedApp?.app === undefined
-      ) {
-        return [fieldCode, property] as const;
-      }
-
-      const relatedAppId = property.referenceTable.relatedApp.app;
-      let relatedSchema = relatedSchemaCache.get(relatedAppId);
-
-      if (relatedSchema === undefined) {
-        relatedSchema = await fetchFormFields(appClient, relatedAppId, options?.lang);
-        relatedSchemaCache.set(relatedAppId, relatedSchema);
-      }
-
-      return [
-        fieldCode,
-        {
-          ...property,
-          fields: resolveRelatedRecordFields(property, relatedSchema),
-        },
-      ] as const;
-    }),
-  );
-
-  return {
-    ...schema,
-    properties: Object.fromEntries(properties),
   };
 };
 
@@ -282,41 +273,10 @@ export const loadSchemaFromSnapshot = async (
   );
 };
 
-const createKintoneClient = async (options: LiveSchemaSourceOptions) => {
-  const module = await import("@kintone/rest-api-client");
-  const auth =
-    options.apiToken !== undefined
-      ? { apiToken: options.apiToken }
-      : options.username !== undefined && options.password !== undefined
-        ? { username: options.username, password: options.password }
-        : null;
-
-  if (auth === null) {
-    throw new CliUsageError(
-      "Live schema fetch requires either --api-token or both --username and --password.",
-    );
-  }
-
-  const clientOptions: ConstructorParameters<typeof module.KintoneRestAPIClient>[0] = {
-    baseUrl: options.baseUrl,
-    auth,
-  };
-
-  if (options.guestSpaceId !== undefined) {
-    clientOptions.guestSpaceId = options.guestSpaceId;
-  }
-
-  return new module.KintoneRestAPIClient(clientOptions);
-};
-
 export const loadSchemaFromLiveKintone = async (
   options: LiveSchemaSourceOptions,
 ): Promise<KintoneSchemaSource> => {
-  const client = await createKintoneClient(options);
-  const snapshotBundle = await createSnapshotBundleFromClient(client.app, {
-    appId: String(options.appId),
-    ...(options.lang === undefined ? {} : { lang: options.lang }),
-  });
+  const snapshotBundle = await createSnapshotBundleFromLiveOptions(options);
   const schema =
     snapshotBundle.relatedApps === undefined
       ? snapshotBundle.schema
@@ -331,9 +291,5 @@ export const loadSchemaFromLiveKintone = async (
 export const createSnapshotBundleFromLiveKintone = async (
   options: LiveSchemaSourceOptions,
 ): Promise<SnapshotSchemaBundle> => {
-  const client = await createKintoneClient(options);
-  return createSnapshotBundleFromClient(client.app, {
-    appId: String(options.appId),
-    ...(options.lang === undefined ? {} : { lang: options.lang }),
-  });
+  return createSnapshotBundleFromLiveOptions(options);
 };
